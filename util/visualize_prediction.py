@@ -19,6 +19,67 @@ from prototree.branch import Branch
 from prototree.leaf import Leaf
 from prototree.node import Node
 
+from util.gradients import smoothgrads, normalize_min_max
+
+
+def smoothgrads_local(
+        tree: ProtoTree,
+        sample: torch.Tensor,
+        sample_dir: str,
+        folder_name: str,
+        img_name: str,
+        decision_path: list,
+        args: argparse.Namespace):
+
+    dir = os.path.join(os.path.join(os.path.join(args.log_dir, folder_name), img_name), args.dir_for_saving_images)
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+
+    img = Image.open(sample_dir)
+    x_np = np.asarray(img)
+    x_np = np.float32(x_np) / 255
+    if x_np.ndim == 2:  # convert grayscale to RGB
+        x_np = np.stack((x_np,) * 3, axis=-1)
+    img_size = x_np.shape[:2]
+
+    for i, node in enumerate(decision_path[:-1]):
+        decision_node_idx = node.index
+        node_id = tree._out_map[node]
+        grads = smoothgrads(tree=tree, sample=sample, node_id=node_id, device=sample.device, normalize=False)
+        # grads has the shape of the network input, resize to img dimensions
+        grads = cv2.resize(grads, dsize=(img_size[1], img_size[0]), interpolation=cv2.INTER_CUBIC)
+        grads = normalize_min_max(grads)
+        heatmap = cv2.applyColorMap(np.uint8(255 * grads), cv2.COLORMAP_JET)
+        heatmap = np.float32(heatmap) / 255
+        heatmap = heatmap[..., ::-1]
+        plt.imsave(
+            fname=os.path.join(dir, '%s_smoothgrads_heatmap.png' % str(decision_node_idx)),
+            arr=heatmap,
+            vmin=0.0, vmax=1.0)
+        overlayed_original_img = 0.5 * x_np + 0.2 * heatmap
+        plt.imsave(
+            fname=os.path.join(dir, '%s_smoothgrads_heatmap_original_image.png' % str(decision_node_idx)),
+            arr=overlayed_original_img,
+            vmin=0.0, vmax=1.0)
+
+        high_act_patch_indices = find_high_activation_crop(grads, args.upsample_threshold)
+        high_act_patch = x_np[high_act_patch_indices[0]:high_act_patch_indices[1],
+                         high_act_patch_indices[2]:high_act_patch_indices[3], :]
+        plt.imsave(
+            fname=os.path.join(dir, '%s_smoothgrads_nearest_patch_of_image.png' % str(decision_node_idx)),
+            arr=high_act_patch,
+            vmin=0.0, vmax=1.0)
+
+        # save the original image with bounding box showing high activation patch
+        imsave_with_bbox(
+            fname=os.path.join(dir, '%s_smoothgrads_bounding_box_nearest_patch_of_image.png' % str(decision_node_idx)),
+            img_rgb=x_np,
+            bbox_height_start=high_act_patch_indices[0],
+            bbox_height_end=high_act_patch_indices[1],
+            bbox_width_start=high_act_patch_indices[2],
+            bbox_width_end=high_act_patch_indices[3],
+            color=(0, 255, 255))
+
 def upsample_local(tree: ProtoTree,
                  sample: torch.Tensor,
                  sample_dir: str,
@@ -130,7 +191,10 @@ def gen_pred_vis(tree: ProtoTree,
     leaf = tree.nodes_by_index[leaf_ix]
     decision_path = tree.path_to(leaf)
 
-    upsample_local(tree,sample,sample_dir,folder_name,img_name,decision_path,args)
+    if args.use_smoothgrads:
+        smoothgrads_local(tree, sample, sample_dir, folder_name, img_name, decision_path, args)
+    else:
+        upsample_local(tree, sample, sample_dir, folder_name, img_name, decision_path, args)
 
     # Prediction graph is visualized using Graphviz
     # Build dot string
@@ -146,11 +210,12 @@ def gen_pred_vis(tree: ProtoTree,
     # Starting from the leaf
     for i, node in enumerate(decision_path[:-1]):
         node_ix = node.index
+        local_node_ix = node_ix if not args.use_smoothgrads else f'{node_ix}_smoothgrads'
         prob = probs[node_ix].item()
 
         s += f'node_{i+1}[image="{upsample_path}/{node_ix}_nearest_patch_of_image.png" group="{"g"+str(i)}"];\n'
         if prob > 0.5:
-            s += f'node_{i+1}_original[image="{local_upsample_path}/{node_ix}_bounding_box_nearest_patch_of_image.png" imagescale=width group="{"g"+str(i)}"];\n'
+            s += f'node_{i+1}_original[image="{local_upsample_path}/{local_node_ix}_bounding_box_nearest_patch_of_image.png" imagescale=width group="{"g"+str(i)}"];\n'
             label = "Present      \nSimilarity %.4f                   "%prob
             s += f'node_{i+1}->node_{i+1}_original [label="{label}" fontsize=10 fontname=Helvetica];\n'
         else:
