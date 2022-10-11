@@ -1,0 +1,6 @@
+torch >= 1.09
+torchvision >= 0.8.2
+numpy >= 1.19.5
+pillow == 9.0.0
+setuptools~=60.2.0
+tqdm~=4.62.3
