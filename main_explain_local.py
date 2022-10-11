@@ -30,6 +30,9 @@ def get_local_expl_args() -> argparse.Namespace:
                         type=str,
                         default='local_explanations',
                         help='Directory where local explanations will be saved')
+    parser.add_argument('--use_smoothgrads',
+                        action='store_true',
+                        help='Use Smoothgrads rather than Cubic interpolation in order to locate patches of images')
     parser.add_argument('--disable_cuda',
                         action='store_true',
                         help='Flag that disables GPU usage if set')
