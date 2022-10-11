@@ -226,6 +226,20 @@ class ProtoTree(nn.Module):
 
         return features, distances, dict(self._out_map)
 
+    def train(self, mode: bool = True) -> nn.Module:
+        """ Overwrite train() function to freeze elements if necessary
+
+        :param mode: Train (true) or eval (false)
+        """
+        self._net.train(mode)
+        self._add_on.train(mode)
+        self.prototype_layer.train(mode)
+        # Fix BatchNorm training status
+        for name, layer in self._net.named_modules():
+            if isinstance(layer, torch.nn.BatchNorm2d):
+                layer.train(layer.weight.requires_grad and mode)
+        return self
+
     @property
     def depth(self) -> int:
         d = lambda node: 1 if isinstance(node, Leaf) else 1 + max(d(node.l), d(node.r))

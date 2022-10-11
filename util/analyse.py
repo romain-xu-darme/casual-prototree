@@ -59,6 +59,7 @@ def analyse_leaf_distributions(tree: ProtoTree, log: Log):
     log.log_message("Max values in softmax leaf distributions: \n"+str(max_values))
 
 def analyse_output_shape(tree: ProtoTree, trainloader: DataLoader, log: Log, device):
+    tree.eval()
     with torch.no_grad():
         # Get a batch of training data
         xs, ys = next(iter(trainloader))
