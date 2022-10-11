@@ -32,7 +32,7 @@ base_architecture_to_features = {'resnet18': resnet18_features,
 """
 def get_network(num_in_channels: int, args: argparse.Namespace):
     # Define a conv net for estimating the probabilities at each decision node
-    features = base_architecture_to_features[args.net](pretrained=not args.disable_pretrained)            
+    features = base_architecture_to_features[args.net](pretrained=not args.disable_pretrained)
     features_name = str(features).upper()
     if features_name.startswith('VGG') or features_name.startswith('RES'):
         first_add_on_layer_in_channels = \
@@ -42,11 +42,11 @@ def get_network(num_in_channels: int, args: argparse.Namespace):
             [i for i in features.modules() if isinstance(i, nn.BatchNorm2d)][-1].num_features
     else:
         raise Exception('other base base_architecture NOT implemented')
-    
+
     add_on_layers = nn.Sequential(
                     nn.Conv2d(in_channels=first_add_on_layer_in_channels, out_channels=args.num_features, kernel_size=1, bias=False),
                     nn.Sigmoid()
-                    ) 
+                    )
     return features, add_on_layers
 
 def freeze(tree: ProtoTree, epoch: int, params_to_freeze: list, params_to_train: list, args: argparse.Namespace, log: Log):

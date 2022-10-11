@@ -10,7 +10,7 @@ import torchvision.transforms as transforms
 from torchvision.transforms import ToTensor, Normalize, Compose, Lambda
 
 
-def get_data(args: argparse.Namespace): 
+def get_data(args: argparse.Namespace):
     """
     Load the proper dataset based on the parsed arguments
     :param args: The arguments in which is specified which dataset should be used
@@ -56,7 +56,7 @@ def get_dataloaders(args: argparse.Namespace):
     return trainloader, projectloader, testloader, classes, c
 
 
-def get_birds(augment: bool, train_dir:str, project_dir: str, test_dir:str, img_size = 224): 
+def get_birds(augment: bool, train_dir:str, project_dir: str, test_dir:str, img_size = 224):
     shape = (3, img_size, img_size)
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
@@ -90,7 +90,7 @@ def get_birds(augment: bool, train_dir:str, project_dir: str, test_dir:str, img_
     return trainset, projectset, testset, classes, shape
 
 
-def get_cars(augment: bool, train_dir:str, project_dir: str, test_dir:str, img_size = 224): 
+def get_cars(augment: bool, train_dir:str, project_dir: str, test_dir:str, img_size = 224):
     shape = (3, img_size, img_size)
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
@@ -122,7 +122,7 @@ def get_cars(augment: bool, train_dir:str, project_dir: str, test_dir:str, img_s
     projectset = torchvision.datasets.ImageFolder(project_dir, transform=transform_no_augment)
     testset = torchvision.datasets.ImageFolder(test_dir, transform=transform_no_augment)
     classes = trainset.classes
-    
+
     return trainset, projectset, testset, classes, shape
 
 

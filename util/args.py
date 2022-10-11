@@ -39,19 +39,19 @@ def get_args() -> argparse.Namespace:
                         help='The optimizer that should be used when training the tree')
     parser.add_argument('--lr',
                         type=float,
-                        default=0.001, 
+                        default=0.001,
                         help='The optimizer learning rate for training the prototypes')
     parser.add_argument('--lr_block',
                         type=float,
-                        default=0.001, 
+                        default=0.001,
                         help='The optimizer learning rate for training the 1x1 conv layer and last conv layer of the underlying neural network (applicable to resnet50 and densenet121)')
     parser.add_argument('--lr_net',
                         type=float,
-                        default=1e-5, 
+                        default=1e-5,
                         help='The optimizer learning rate for the underlying neural network')
     parser.add_argument('--lr_pi',
                         type=float,
-                        default=0.001, 
+                        default=0.001,
                         help='The optimizer learning rate for the leaf distributions (only used if disable_derivative_free_leaf_optim flag is set')
     parser.add_argument('--momentum',
                         type=float,
@@ -136,7 +136,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument('--nr_trees_ensemble',
                         type=int,
                         default=5,
-                        help='Number of ProtoTrees to train and (optionally) use in an ensemble. Used in main_ensemble.py') 
+                        help='Number of ProtoTrees to train and (optionally) use in an ensemble. Used in main_ensemble.py')
     args = parser.parse_args()
     args.milestones = get_milestones(args)
     return args
@@ -174,8 +174,8 @@ def save_args(args: argparse.Namespace, directory_path: str) -> None:
             f.write('{}: {}\n'.format(arg, val))
     # Pickle the args for possible reuse
     with open(directory_path + '/args.pickle', 'wb') as f:
-        pickle.dump(args, f)                                                                               
-    
+        pickle.dump(args, f)
+
 
 def load_args(directory_path: str) -> argparse.Namespace:
     """
@@ -214,11 +214,11 @@ def get_optimizer(tree, args: argparse.Namespace) -> torch.optim.Optimizer:
                 params_to_freeze.append(param)
             else:
                 params_to_train.append(param)
-   
+
         if optim_type == 'SGD':
             paramlist = [
                 {"params": params_to_freeze, "lr": args.lr_net, "weight_decay_rate": args.weight_decay, "momentum": args.momentum},
-                {"params": params_to_train, "lr": args.lr_block, "weight_decay_rate": args.weight_decay,"momentum": args.momentum}, 
+                {"params": params_to_train, "lr": args.lr_block, "weight_decay_rate": args.weight_decay,"momentum": args.momentum},
                 {"params": tree._add_on.parameters(), "lr": args.lr_block, "weight_decay_rate": args.weight_decay,"momentum": args.momentum},
                 {"params": tree.prototype_layer.parameters(), "lr": args.lr,"weight_decay_rate": 0,"momentum": 0}]
             if args.disable_derivative_free_leaf_optim:
@@ -226,23 +226,23 @@ def get_optimizer(tree, args: argparse.Namespace) -> torch.optim.Optimizer:
         else:
             paramlist = [
                 {"params": params_to_freeze, "lr": args.lr_net, "weight_decay_rate": args.weight_decay},
-                {"params": params_to_train, "lr": args.lr_block, "weight_decay_rate": args.weight_decay}, 
+                {"params": params_to_train, "lr": args.lr_block, "weight_decay_rate": args.weight_decay},
                 {"params": tree._add_on.parameters(), "lr": args.lr_block, "weight_decay_rate": args.weight_decay},
                 {"params": tree.prototype_layer.parameters(), "lr": args.lr,"weight_decay_rate": 0}]
-            
+
             if args.disable_derivative_free_leaf_optim:
                 paramlist.append({"params": dist_params, "lr": args.lr_pi, "weight_decay_rate": 0})
-    
+
     else: #other network architectures
         for name,param in tree._net.named_parameters():
             params_to_freeze.append(param)
         paramlist = [
-            {"params": params_to_freeze, "lr": args.lr_net, "weight_decay_rate": args.weight_decay}, 
+            {"params": params_to_freeze, "lr": args.lr_net, "weight_decay_rate": args.weight_decay},
             {"params": tree._add_on.parameters(), "lr": args.lr_block, "weight_decay_rate": args.weight_decay},
             {"params": tree.prototype_layer.parameters(), "lr": args.lr,"weight_decay_rate": 0}]
         if args.disable_derivative_free_leaf_optim:
             paramlist.append({"params": dist_params, "lr": args.lr_pi, "weight_decay_rate": 0})
-    
+
     if optim_type == 'SGD':
         return torch.optim.SGD(paramlist,
                                lr=args.lr,

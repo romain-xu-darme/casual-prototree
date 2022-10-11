@@ -3,7 +3,7 @@ import tarfile
 import os
 import gdown
 # url = 'http://www.vision.caltech.edu/visipedia-data/CUB-200-2011/CUB_200_2011.tgz'
-url = 'https://drive.google.com/uc?id=1hbzc_P1FuxMkcabkgn9ZKinBwW683j45' 
+url = 'https://drive.google.com/uc?id=1hbzc_P1FuxMkcabkgn9ZKinBwW683j45'
 target_path = './data/CUB_200_2011/CUB-200-2011.tgz' #you might need to change the name to CUB_200_2011.tgz
 
 print(os.path.abspath(target_path))
@@ -15,7 +15,7 @@ print(os.path.abspath(target_path))
 
 #or download it manually and uncomment the line below
 gdown.download(url, target_path, quiet=False)
- 
+
 tar = tarfile.open(target_path, "r:gz")
 tar.extractall(path='./data')
 tar.close()

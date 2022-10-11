@@ -30,7 +30,7 @@ def gen_vis(tree: ProtoTree, folder_name: str, args: argparse.Namespace, classes
 
     with open(os.path.join(destination_folder,'treevis.dot'), 'w') as f:
         f.write(s)
-   
+
     from_p = os.path.join(destination_folder,'treevis.dot')
     to_pdf = os.path.join(destination_folder,'treevis.pdf')
     check_call('dot -Tpdf -Gmargin=0 %s -o %s'%(from_p, to_pdf), shell=True)
@@ -47,7 +47,7 @@ def _leaf_vis(node: Leaf):
         ws = copy.deepcopy(torch.exp(node.distribution()).cpu().detach().numpy())
     else:
         ws = copy.deepcopy(node.distribution().cpu().detach().numpy())
-    
+
     ws = np.ones(ws.shape) - ws
     ws *= 255
 
@@ -77,13 +77,13 @@ def _leaf_vis(node: Leaf):
 
 def _branch_vis(node: Branch, upsample_dir: str):
     branch_id = node.index
-    
+
     img = Image.open(os.path.join(upsample_dir, '%s_nearest_patch_of_image.png'%branch_id))
     bb = Image.open(os.path.join(upsample_dir, '%s_bounding_box_nearest_patch_of_image.png'%branch_id))
     map = Image.open(os.path.join(upsample_dir, '%s_heatmap_original_image.png'%branch_id))
     w, h = img.size
     wbb, hbb = bb.size
-    
+
     if wbb < 100 and hbb < 100:
         cs = wbb, hbb
     else:
@@ -103,7 +103,7 @@ def _branch_vis(node: Branch, upsample_dir: str):
     between = 4
     total_w = w+wbb + between
     total_h = max(h, hbb)
-    
+
 
     together = Image.new(img.mode, (total_w, total_h), color=(255,255,255))
     together.paste(img, (0, 0))
@@ -147,7 +147,7 @@ def _gen_dot_edges(node: Node, classes:tuple):
         edge_r, targets_r = _gen_dot_edges(node.r, classes)
         str_targets_l = ','.join(str(t) for t in targets_l) if len(targets_l) > 0 else ""
         str_targets_r = ','.join(str(t) for t in targets_r) if len(targets_r) > 0 else ""
-        s = '{} -> {} [label="Absent" fontsize=10 tailport="s" headport="n" fontname=Helvetica];\n {} -> {} [label="Present" fontsize=10 tailport="s" headport="n" fontname=Helvetica];\n'.format(node.index, node.l.index, 
+        s = '{} -> {} [label="Absent" fontsize=10 tailport="s" headport="n" fontname=Helvetica];\n {} -> {} [label="Present" fontsize=10 tailport="s" headport="n" fontname=Helvetica];\n'.format(node.index, node.l.index,
                                                                        node.index, node.r.index)
         return s + edge_l + edge_r, sorted(list(set(targets_l + targets_r)))
     if isinstance(node, Leaf):

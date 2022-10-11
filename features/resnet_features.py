@@ -273,7 +273,7 @@ def resnet50_features_inat(pretrained=False, **kwargs):
         pretrained (bool): If True, returns a model pre-trained on Inaturalist2017
     """
     model = ResNet_features(Bottleneck, [3, 4, 6, 3], **kwargs)
-    
+
     if pretrained:
         #use BBN pretrained weights of the conventional learning branch (from BBN.iNaturalist2017.res50.180epoch.best_model.pth)
         #https://openaccess.thecvf.com/content_CVPR_2020/papers/Zhou_BBN_Bilateral-Branch_Network_With_Cumulative_Learning_for_Long-Tailed_Visual_Recognition_CVPR_2020_paper.pdf

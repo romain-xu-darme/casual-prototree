@@ -6,7 +6,7 @@ from util.log import Log
 from copy import deepcopy
 import torch
 
-# Collects the nodes 
+# Collects the nodes
 def nodes_to_prune_based_on_leaf_dists_threshold(tree: ProtoTree, threshold: float) -> list:
     to_prune_incl_possible_children = []
     for node in tree.nodes:
@@ -20,17 +20,17 @@ def has_max_prob_lower_threshold(node: Node, threshold: float):
     if isinstance(node, Branch):
         for leaf in node.leaves:
             if leaf._log_probabilities:
-                if torch.max(torch.exp(leaf.distribution())).item() > threshold: 
+                if torch.max(torch.exp(leaf.distribution())).item() > threshold:
                     return False
             else:
-                if torch.max(leaf.distribution()).item() > threshold: 
+                if torch.max(leaf.distribution()).item() > threshold:
                     return False
     elif isinstance(node, Leaf):
         if node._log_probabilities:
-            if torch.max(torch.exp(node.distribution())).item() > threshold: 
+            if torch.max(torch.exp(node.distribution())).item() > threshold:
                 return False
         else:
-            if torch.max(node.distribution()).item() > threshold: 
+            if torch.max(node.distribution()).item() > threshold:
                 return False
     else:
         raise Exception('This node type should not be possible. A tree has branches and leaves.')
@@ -51,7 +51,7 @@ def prune(tree: ProtoTree, pruning_threshold_leaves: float, log: Log) -> list:
                 for child in tree.nodes_by_index[node_idx].nodes:
                     if child.index in to_prune and child.index != node_idx:
                         to_prune.remove(child.index)
-    
+
     for node_idx in to_prune:
         node = tree.nodes_by_index[node_idx]
         parent = tree._parents[node]

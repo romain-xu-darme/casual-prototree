@@ -12,7 +12,7 @@ def get_avg_path_length(tree: ProtoTree, info: dict, log: Log):
     if 'out_leaf_ix' not in info.keys():
         log.log_message("Soft tree with distributed routing. Path length is always %s across all nodes"%(tree.depth))
     else: #greedy or sample_max routing
-        depths = tree.node_depths        
+        depths = tree.node_depths
         # Get a dict mapping all node indices to the node objects
         node_ixs = tree.nodes_by_index
         ixs = info['out_leaf_ix']  # Get all indices of the leaves corresponding to the decisions
@@ -82,10 +82,10 @@ def analyse_leafs(tree: ProtoTree, epoch: int, k: int, leaf_labels: dict, thresh
         leaf_labels[epoch] = []
         leafs_higher_than = []
         classes_covered = []
-        
+
         for leaf in tree.leaves:
             label = torch.argmax(leaf._dist_params).item()
-            
+
             if leaf._log_probabilities:
                 value = torch.max(torch.exp(leaf.distribution())).item()
             else:
@@ -101,7 +101,7 @@ def analyse_leafs(tree: ProtoTree, epoch: int, k: int, leaf_labels: dict, thresh
             if c not in classes_covered:
                 class_without_leaf +=1
         log.log_message("Classes without leaf: %s"%str(class_without_leaf))
-        
+
         if len(leaf_labels.keys())>=2:
             changed_prev = 0
             changed_prev_higher = 0
@@ -120,7 +120,7 @@ def analyse_ensemble(log, args, test_loader, device, trained_orig_trees, trained
     print("\nAnalysing and evaluating ensemble with %s trees of height %s..."%(len(trained_orig_trees), args.depth),flush=True)
     log.log_message("\n-----------------------------------------------------------------------------------------------------------------")
     log.log_message("\nAnalysing and evaluating ensemble with %s trees of height %s..."%(len(trained_orig_trees), args.depth))
-    
+
     '''
     CALCULATE MEAN AND STANDARD DEVIATION BETWEEN RUNS
     '''
@@ -173,7 +173,7 @@ def analyse_ensemble(log, args, test_loader, device, trained_orig_trees, trained
         fidelities_greedy.append(info['distr_greedy_fidelity'])
     log.log_message("Mean and standard deviation of fidelity of pruned and projected individual trees with sample_max routing:\n "+ "mean="+str(np.mean(fidelities_sample_max))+", std="+str(np.std(fidelities_sample_max)))
     log.log_message("Mean and standard deviation of fidelity of pruned and projected individual trees with greedy routing:\n "+ "mean="+str(np.mean(fidelities_greedy))+", std="+str(np.std(fidelities_greedy)))
-    
+
     '''
     CALCULATE MEAN AND STANDARD DEVIATION OF PATH LENGTH WITH DETERMINISTIC ROUTING
     '''

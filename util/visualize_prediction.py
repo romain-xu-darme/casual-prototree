@@ -26,7 +26,7 @@ def upsample_local(tree: ProtoTree,
                  img_name: str,
                  decision_path: list,
                  args: argparse.Namespace):
-    
+
     dir = os.path.join(os.path.join(os.path.join(args.log_dir, folder_name),img_name), args.dir_for_saving_images)
     if not os.path.exists(dir):
         os.makedirs(dir)
@@ -41,7 +41,7 @@ def upsample_local(tree: ProtoTree,
         x_np = np.float32(x_np)/ 255
         if x_np.ndim == 2: #convert grayscale to RGB
             x_np = np.stack((x_np,)*3, axis=-1)
-        
+
         img_size = x_np.shape[:2]
         similarity_map = sim_map[node_id]
 
@@ -66,12 +66,12 @@ def upsample_local(tree: ProtoTree,
         # save the highly activated patch
         masked_similarity_map = np.ones(similarity_map.shape)
         masked_similarity_map[similarity_map < np.max(similarity_map)] = 0 #mask similarity map such that only the nearest patch z* is visualized
-        
+
         upsampled_prototype_pattern = cv2.resize(masked_similarity_map,
                                             dsize=(img_size[1], img_size[0]),
                                             interpolation=cv2.INTER_CUBIC)
-        plt.imsave(fname=os.path.join(dir,'%s_masked_upsampled_heatmap.png'%str(decision_node_idx)), arr=upsampled_prototype_pattern, vmin=0.0,vmax=1.0) 
-            
+        plt.imsave(fname=os.path.join(dir,'%s_masked_upsampled_heatmap.png'%str(decision_node_idx)), arr=upsampled_prototype_pattern, vmin=0.0,vmax=1.0)
+
         high_act_patch_indices = find_high_activation_crop(upsampled_prototype_pattern, args.upsample_threshold)
         high_act_patch = x_np[high_act_patch_indices[0]:high_act_patch_indices[1],
                                             high_act_patch_indices[2]:high_act_patch_indices[3], :]
@@ -94,14 +94,14 @@ def gen_pred_vis(tree: ProtoTree,
                  pred_kwargs: dict = None,
                  ):
     pred_kwargs = pred_kwargs or dict()  # TODO -- assert deterministic routing
-    
+
     # Create dir to store visualization
     img_name = sample_dir.split('/')[-1].split(".")[-2]
-    
+
     if not os.path.exists(os.path.join(args.log_dir, folder_name)):
         os.makedirs(os.path.join(args.log_dir, folder_name))
     destination_folder=os.path.join(os.path.join(args.log_dir, folder_name),img_name)
-    
+
     if not os.path.isdir(destination_folder):
         os.mkdir(destination_folder)
     if not os.path.isdir(destination_folder + '/node_vis'):
@@ -147,10 +147,10 @@ def gen_pred_vis(tree: ProtoTree,
     for i, node in enumerate(decision_path[:-1]):
         node_ix = node.index
         prob = probs[node_ix].item()
-        
-        s += f'node_{i+1}[image="{upsample_path}/{node_ix}_nearest_patch_of_image.png" group="{"g"+str(i)}"];\n' 
+
+        s += f'node_{i+1}[image="{upsample_path}/{node_ix}_nearest_patch_of_image.png" group="{"g"+str(i)}"];\n'
         if prob > 0.5:
-            s += f'node_{i+1}_original[image="{local_upsample_path}/{node_ix}_bounding_box_nearest_patch_of_image.png" imagescale=width group="{"g"+str(i)}"];\n'  
+            s += f'node_{i+1}_original[image="{local_upsample_path}/{node_ix}_bounding_box_nearest_patch_of_image.png" imagescale=width group="{"g"+str(i)}"];\n'
             label = "Present      \nSimilarity %.4f                   "%prob
             s += f'node_{i+1}->node_{i+1}_original [label="{label}" fontsize=10 fontname=Helvetica];\n'
         else:
@@ -158,7 +158,7 @@ def gen_pred_vis(tree: ProtoTree,
             label = "Absent      \nSimilarity %.4f                   "%prob
             s += f'node_{i+1}->node_{i+1}_original [label="{label}" fontsize=10 fontname=Helvetica];\n'
         # s += f'node_{i+1}_original->node_{i+1} [label="{label}" fontsize=10 fontname=Helvetica];\n'
-        
+
         s += f'node_{i+1}->node_{i+2};\n'
         s += "{rank = same; "f'node_{i+1}_original'+"; "+f'node_{i+1}'+"};"
 

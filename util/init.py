@@ -17,14 +17,14 @@ def init_tree(tree: ProtoTree, optimizer, scheduler, device, args: argparse.Name
     std = 0.1
     # load trained prototree if flag is set
 
-    # NOTE: TRAINING FURTHER FROM A CHECKPOINT DOESN'T SEEM TO WORK CORRECTLY. EVALUATING A TRAINED PROTOTREE FROM A CHECKPOINT DOES WORK. 
+    # NOTE: TRAINING FURTHER FROM A CHECKPOINT DOESN'T SEEM TO WORK CORRECTLY. EVALUATING A TRAINED PROTOTREE FROM A CHECKPOINT DOES WORK.
     if args.state_dict_dir_tree != '':
         if not args.disable_cuda and torch.cuda.is_available():
             device = torch.device('cuda:{}'.format(torch.cuda.current_device()))
         else:
             device = torch.device('cpu')
 
-        
+
         if args.disable_cuda or not torch.cuda.is_available():
         # tree = load_state(args.state_dict_dir_tree, device)
             tree = torch.load(args.state_dict_dir_tree+'/model.pth', map_location=device)
@@ -44,20 +44,20 @@ def init_tree(tree: ProtoTree, optimizer, scheduler, device, args: argparse.Name
         if not args.disable_derivative_free_leaf_optim:
             for leaf in tree.leaves:
                 leaf._dist_params.requires_grad = False
-        
+
         if os.path.isfile(args.state_dict_dir_tree+'/scheduler_state.pth'):
             # scheduler.load_state_dict(torch.load(args.state_dict_dir_tree+'/scheduler_state.pth'))
             # print(scheduler.state_dict(),flush=True)
             scheduler.last_epoch = epoch - 1
             scheduler._step_count = epoch
-        
+
 
     elif args.state_dict_dir_net != '': # load pretrained conv network
         # initialize prototypes
         torch.nn.init.normal_(tree.prototype_layer.prototype_vectors, mean=mean, std=std)
         #strict is False so when loading pretrained model, ignore the linear classification layer
         tree._net.load_state_dict(torch.load(args.state_dict_dir_net+'/model_state.pth'), strict=False)
-        tree._add_on.load_state_dict(torch.load(args.state_dict_dir_net+'/model_state.pth'), strict=False) 
+        tree._add_on.load_state_dict(torch.load(args.state_dict_dir_net+'/model_state.pth'), strict=False)
     else:
         with torch.no_grad():
             # initialize prototypes

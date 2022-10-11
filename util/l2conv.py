@@ -7,7 +7,7 @@ import torch.nn.functional as F
 class L2Conv2D(nn.Module):
 
     """
-    Convolutional layer that computes the squared L2 distance instead of the conventional inner product. 
+    Convolutional layer that computes the squared L2 distance instead of the conventional inner product.
     """
 
     def __init__(self, num_prototypes, num_features, w_1, h_1):
@@ -58,7 +58,7 @@ class L2Conv2D(nn.Module):
         # Use the values to compute the squared L2 distance
         distance = xs_squared_l2 + ps_squared_l2 - 2 * xs_conv
         distance = torch.sqrt(torch.abs(distance)+1e-14) #L2 distance (not squared). Small epsilon added for numerical stability
-        
+
         if torch.isnan(distance).any():
             raise Exception('Error: NaN values! Using the --log_probabilities flag might fix this issue')
         return distance  # Shape: (bs, num_prototypes, w_in, h_in)

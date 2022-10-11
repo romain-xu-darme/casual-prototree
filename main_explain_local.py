@@ -53,7 +53,7 @@ def explain_local(args):
         device = torch.device('cuda:{}'.format(torch.cuda.current_device()))
     else:
         device = torch.device('cpu')
-        
+
     # Log which device was actually used
     print('Device used: ',str(device))
 
@@ -71,7 +71,7 @@ def explain_local(args):
                         transforms.ToTensor(),
                         normalize
                     ])
-    
+
     sample = test_transform(Image.open(args.sample_dir)).unsqueeze(0).to(device)
 
     gen_pred_vis(tree, sample, args.sample_dir, args.results_dir, args, classes)
@@ -90,7 +90,7 @@ if __name__ == '__main__':
             os.makedirs(os.path.join(os.path.join(args.log_dir, args.results_dir),class_name))
         for filename in os.listdir(args.sample_dir):
             print(filename)
-            if filename.endswith(".jpg") or filename.endswith(".png"): 
+            if filename.endswith(".jpg") or filename.endswith(".png"):
                 args_1 = deepcopy(args)
                 args_1.sample_dir = args.sample_dir+"/"+filename
                 args_1.results_dir = os.path.join(args.results_dir, class_name)

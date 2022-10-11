@@ -38,7 +38,7 @@ class ProtoTree(nn.Module):
         self.num_features = args.num_features
         self.num_prototypes = self.num_branches
         self.prototype_shape = (args.W1, args.H1, args.num_features)
-        
+
         # Keep a dict that stores a reference to each node's parent
         # Key: node -> Value: the node's parent
         # The root of the tree is mapped to None
@@ -52,7 +52,7 @@ class ProtoTree(nn.Module):
         # Flag that indicates whether probabilities or log probabilities are computed
         self._log_probabilities = args.log_probabilities
 
-        # Flag that indicates whether a normalization factor should be used instead of softmax. 
+        # Flag that indicates whether a normalization factor should be used instead of softmax.
         self._kontschieder_normalization = args.kontschieder_normalization
         self._kontschieder_train = args.kontschieder_train
         # Map each decision node to an output of the feature net
@@ -289,11 +289,11 @@ class ProtoTree(nn.Module):
         with open(directory_path + '/tree.pkl', 'wb') as f:
             pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-        
+
     @staticmethod
     def load(directory_path: str):
-        return torch.load(directory_path + '/model.pth')      
-       
+        return torch.load(directory_path + '/model.pth')
+
     def _init_tree(self,
                    num_classes,
                    args: argparse.Namespace) -> Node:

@@ -21,7 +21,7 @@ def train_epoch(tree: ProtoTree,
                 log_prefix: str = 'log_train_epochs',
                 progress_prefix: str = 'Train Epoch'
                 ) -> dict:
-    
+
     tree = tree.to(device)
     # Make sure the model is in eval mode
     tree.eval()
@@ -57,38 +57,38 @@ def train_epoch(tree: ProtoTree,
         # Perform a forward pass through the network
         ys_pred, info = tree.forward(xs)
 
-        # Learn prototypes and network with gradient descent. 
+        # Learn prototypes and network with gradient descent.
         # If disable_derivative_free_leaf_optim, leaves are optimized with gradient descent as well.
         # Compute the loss
         if tree._log_probabilities:
             loss = F.nll_loss(ys_pred, ys)
         else:
             loss = F.nll_loss(torch.log(ys_pred), ys)
-        
+
         # Compute the gradient
         loss.backward()
         # Update model parameters
         optimizer.step()
-        
+
         if not disable_derivative_free_leaf_optim:
             #Update leaves with derivate-free algorithm
             #Make sure the tree is in eval mode
             tree.eval()
             with torch.no_grad():
-                target = eye[ys] #shape (batchsize, num_classes) 
-                for leaf in tree.leaves:  
+                target = eye[ys] #shape (batchsize, num_classes)
+                for leaf in tree.leaves:
                     if tree._log_probabilities:
                         # log version
                         update = torch.exp(torch.logsumexp(info['pa_tensor'][leaf.index] + leaf.distribution() + torch.log(target) - ys_pred, dim=0))
                     else:
-                        update = torch.sum((info['pa_tensor'][leaf.index] * leaf.distribution() * target)/ys_pred, dim=0)  
+                        update = torch.sum((info['pa_tensor'][leaf.index] * leaf.distribution() * target)/ys_pred, dim=0)
                     leaf._dist_params -= (_old_dist_params[leaf]/nr_batches)
                     F.relu_(leaf._dist_params) #dist_params values can get slightly negative because of floating point issues. therefore, set to zero.
                     leaf._dist_params += update
 
         # Count the number of correct classifications
         ys_pred_max = torch.argmax(ys_pred, dim=1)
-        
+
         correct = torch.sum(torch.eq(ys_pred_max, ys))
         acc = correct.item() / float(len(xs))
 
@@ -104,7 +104,7 @@ def train_epoch(tree: ProtoTree,
 
     train_info['loss'] = total_loss/float(i+1)
     train_info['train_accuracy'] = total_acc/float(i+1)
-    return train_info 
+    return train_info
 
 
 def train_epoch_kontschieder(tree: ProtoTree,
@@ -129,7 +129,7 @@ def train_epoch_kontschieder(tree: ProtoTree,
     log_loss = f'{log_prefix}_losses'
     if log is not None and epoch==1:
         log.create_log(log_loss, 'epoch', 'batch', 'loss', 'batch_train_acc')
-    
+
     # Reset the gradients
     optimizer.zero_grad()
 
@@ -144,7 +144,7 @@ def train_epoch_kontschieder(tree: ProtoTree,
         else:
             # Train leaves with Kontschieder's derivative-free algorithm, but using softmax
             train_leaves_epoch(tree, train_loader, epoch, device)
-    # Train prototypes and network. 
+    # Train prototypes and network.
     # If disable_derivative_free_leaf_optim, leafs are optimized with gradient descent as well.
     # Show progress on progress bar
     train_iter = tqdm(enumerate(train_loader),
@@ -172,7 +172,7 @@ def train_epoch_kontschieder(tree: ProtoTree,
 
         # Count the number of correct classifications
         ys_pred = torch.argmax(ys_pred, dim=1)
-        
+
         correct = torch.sum(torch.eq(ys_pred, ys))
         acc = correct.item() / float(len(xs))
 
@@ -185,10 +185,10 @@ def train_epoch_kontschieder(tree: ProtoTree,
 
         if log is not None:
             log.log_values(log_loss, epoch, i + 1, loss.item(), acc)
-        
+
     train_info['loss'] = total_loss/float(i+1)
     train_info['train_accuracy'] = total_acc/float(i+1)
-    return train_info 
+    return train_info
 
 # Updates leaves with derivative-free algorithm
 def train_leaves_epoch(tree: ProtoTree,
@@ -213,21 +213,21 @@ def train_leaves_epoch(tree: ProtoTree,
                         total=len(train_loader),
                         desc=progress_prefix+' %s'%epoch,
                         ncols=0)
-        
-        
+
+
         # Iterate through the data set
         update_sum = dict()
 
         # Create empty tensor for each leaf that will be filled with new values
         for leaf in tree.leaves:
             update_sum[leaf] = torch.zeros_like(leaf._dist_params)
-        
+
         for i, (xs, ys) in train_iter:
             xs, ys = xs.to(device), ys.to(device)
             #Train leafs without gradient descent
             out, info = tree.forward(xs)
-            target = eye[ys] #shape (batchsize, num_classes) 
-            for leaf in tree.leaves:  
+            target = eye[ys] #shape (batchsize, num_classes)
+            for leaf in tree.leaves:
                 if tree._log_probabilities:
                     # log version
                     update = torch.exp(torch.logsumexp(info['pa_tensor'][leaf.index] + leaf.distribution() + torch.log(target) - out, dim=0))

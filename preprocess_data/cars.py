@@ -61,6 +61,6 @@ for idx, cls in enumerate(testing_class[0]):
     if not os.path.exists(output_path):
         os.mkdir(output_path)
     shutil.copy(os.path.join(testing_source, fname), os.path.join(output_path, fname))
- 
+
 time_end = time.time()
 print('Cars dataset processed, %s!' % (time_end - time_start))

@@ -32,7 +32,7 @@ def run_tree(args=None):
         device = torch.device('cuda:{}'.format(torch.cuda.current_device()))
     else:
         device = torch.device('cpu')
-        
+
     # Log which device was actually used
     log.log_message('Device used: '+str(device))
 
@@ -55,7 +55,7 @@ def run_tree(args=None):
     optimizer, params_to_freeze, params_to_train = get_optimizer(tree, args)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=args.milestones, gamma=args.gamma)
     tree, epoch = init_tree(tree, optimizer, scheduler, device, args)
-    
+
     tree.save(f'{log.checkpoint_dir}/tree_init')
     log.log_message("Max depth %s, so %s internal nodes and %s leaves"%(args.depth, tree.num_branches, tree.num_leaves))
     analyse_output_shape(tree, trainloader, log, device)
@@ -73,7 +73,7 @@ def run_tree(args=None):
             # Freeze (part of) network for some epochs if indicated in args
             freeze(tree, epoch, params_to_freeze, params_to_train, args, log)
             log_learning_rates(optimizer, args, log)
-            
+
             # Train tree
             if tree._kontschieder_train:
                 train_info = train_epoch_kontschieder(tree, trainloader, optimizer, epoch, args.disable_derivative_free_leaf_optim, device, log, log_prefix)
@@ -82,7 +82,7 @@ def run_tree(args=None):
             save_tree(tree, optimizer, scheduler, epoch, log, args)
             best_train_acc = save_best_train_tree(tree, optimizer, scheduler, best_train_acc, train_info['train_accuracy'], log)
             leaf_labels = analyse_leafs(tree, epoch, len(classes), leaf_labels, args.pruning_threshold_leaves, log)
-            
+
             # Evaluate tree
             if args.epochs>100:
                 if epoch%10==0 or epoch==args.epochs:
@@ -97,13 +97,13 @@ def run_tree(args=None):
                 original_test_acc = eval_info['test_accuracy']
                 best_test_acc = save_best_test_tree(tree, optimizer, scheduler, best_test_acc, eval_info['test_accuracy'], log)
                 log.log_values('log_epoch_overview', epoch, eval_info['test_accuracy'], train_info['train_accuracy'], train_info['loss'])
-            
+
             scheduler.step()
- 
+
     else: #tree was loaded and not trained, so evaluate only
         '''
             EVALUATE TREE
-        ''' 
+        '''
         eval_info = eval(tree, testloader, epoch, device, log)
         original_test_acc = eval_info['test_accuracy']
         best_test_acc = save_best_test_tree(tree, optimizer, scheduler, best_test_acc, eval_info['test_accuracy'], log)
@@ -116,7 +116,7 @@ def run_tree(args=None):
     trained_tree = deepcopy(tree)
     leaf_labels = analyse_leafs(tree, epoch+1, len(classes), leaf_labels, args.pruning_threshold_leaves, log)
     analyse_leaf_distributions(tree, log)
-    
+
     '''
         PRUNE
     '''
@@ -156,7 +156,7 @@ def run_tree(args=None):
     # visualize tree
     gen_vis(tree, name, args, classes)
 
-    
+
     return trained_tree.to('cpu'), pruned_tree.to('cpu'), pruned_projected_tree.to('cpu'), original_test_acc, pruned_test_acc, pruned_projected_test_acc, project_info, eval_info_samplemax, eval_info_greedy, fidelity_info
 
 

@@ -25,12 +25,12 @@ def upsample(tree: ProtoTree, project_info: dict, project_loader: DataLoader, fo
                 decision_node_idx = prototype_info['node_ix']
                 x = Image.open(imgs[prototype_info['input_image_ix']][0])
                 x.save(os.path.join(dir,'%s_original_image.png'%str(decision_node_idx)))
-                    
+
                 x_np = np.asarray(x)
                 x_np = np.float32(x_np)/ 255
                 if x_np.ndim == 2: #convert grayscale to RGB
                     x_np = np.stack((x_np,)*3, axis=-1)
-                
+
                 img_size = x_np.shape[:2]
                 similarity_map = sim_maps[j]
 
@@ -49,7 +49,7 @@ def upsample(tree: ProtoTree, project_info: dict, project_loader: DataLoader, fo
                 heatmap = cv2.applyColorMap(np.uint8(255*rescaled_act_pattern), cv2.COLORMAP_JET)
                 heatmap = np.float32(heatmap) / 255
                 heatmap = heatmap[...,::-1]
-                
+
                 overlayed_original_img = 0.5 * x_np + 0.2 * heatmap
                 plt.imsave(fname=os.path.join(dir,'%s_heatmap_original_image.png'%str(decision_node_idx)), arr=overlayed_original_img, vmin=0.0,vmax=1.0)
 
@@ -59,12 +59,12 @@ def upsample(tree: ProtoTree, project_info: dict, project_loader: DataLoader, fo
                 W, H = prototype_info['W'], prototype_info['H']
                 assert W == H
                 masked_similarity_map[prototype_index // W, prototype_index % W] = 1 #mask similarity map such that only the nearest patch z* is visualized
-                
+
                 upsampled_prototype_pattern = cv2.resize(masked_similarity_map,
                                                     dsize=(img_size[1], img_size[0]),
                                                     interpolation=cv2.INTER_CUBIC)
-                plt.imsave(fname=os.path.join(dir,'%s_masked_upsampled_heatmap.png'%str(decision_node_idx)), arr=upsampled_prototype_pattern, vmin=0.0,vmax=1.0) 
-                    
+                plt.imsave(fname=os.path.join(dir,'%s_masked_upsampled_heatmap.png'%str(decision_node_idx)), arr=upsampled_prototype_pattern, vmin=0.0,vmax=1.0)
+
                 high_act_patch_indices = find_high_activation_crop(upsampled_prototype_pattern, args.upsample_threshold)
                 high_act_patch = x_np[high_act_patch_indices[0]:high_act_patch_indices[1],
                                                     high_act_patch_indices[2]:high_act_patch_indices[3], :]
@@ -82,7 +82,7 @@ def upsample(tree: ProtoTree, project_info: dict, project_loader: DataLoader, fo
 
 def get_similarity_maps(tree: ProtoTree, project_info: dict, log: Log = None):
     log.log_message("\nCalculating similarity maps (after projection)...")
-    
+
     sim_maps = dict()
     for j in project_info.keys():
         nearest_x = project_info[j]['nearest_input']
