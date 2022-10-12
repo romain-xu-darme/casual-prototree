@@ -26,59 +26,100 @@ def upsample(tree: ProtoTree, project_info: dict, project_loader: DataLoader, fo
                 x = Image.open(imgs[prototype_info['input_image_ix']][0])
                 x.save(os.path.join(dir,'%s_original_image.png'%str(decision_node_idx)))
 
-                x_np = np.asarray(x)
-                x_np = np.float32(x_np)/ 255
-                if x_np.ndim == 2: #convert grayscale to RGB
-                    x_np = np.stack((x_np,)*3, axis=-1)
-
-                img_size = x_np.shape[:2]
-                similarity_map = sim_maps[j]
-
-                rescaled_sim_map = similarity_map - np.amin(similarity_map)
-                rescaled_sim_map= rescaled_sim_map / np.amax(rescaled_sim_map)
-                similarity_heatmap = cv2.applyColorMap(np.uint8(255*rescaled_sim_map), cv2.COLORMAP_JET)
-                similarity_heatmap = np.float32(similarity_heatmap) / 255
-                similarity_heatmap = similarity_heatmap[...,::-1]
-                plt.imsave(fname=os.path.join(dir,'%s_heatmap_latent_similaritymap.png'%str(decision_node_idx)), arr=similarity_heatmap, vmin=0.0,vmax=1.0)
-
-                upsampled_act_pattern = cv2.resize(similarity_map,
-                                                    dsize=(img_size[1], img_size[0]),
-                                                    interpolation=cv2.INTER_CUBIC)
-                rescaled_act_pattern = upsampled_act_pattern - np.amin(upsampled_act_pattern)
-                rescaled_act_pattern = rescaled_act_pattern / np.amax(rescaled_act_pattern)
-                heatmap = cv2.applyColorMap(np.uint8(255*rescaled_act_pattern), cv2.COLORMAP_JET)
-                heatmap = np.float32(heatmap) / 255
-                heatmap = heatmap[...,::-1]
-
-                overlayed_original_img = 0.5 * x_np + 0.2 * heatmap
-                plt.imsave(fname=os.path.join(dir,'%s_heatmap_original_image.png'%str(decision_node_idx)), arr=overlayed_original_img, vmin=0.0,vmax=1.0)
-
-                # save the highly activated patch
-                masked_similarity_map = np.zeros(similarity_map.shape)
                 prototype_index = prototype_info['patch_ix']
                 W, H = prototype_info['W'], prototype_info['H']
                 assert W == H
-                masked_similarity_map[prototype_index // W, prototype_index % W] = 1 #mask similarity map such that only the nearest patch z* is visualized
 
-                upsampled_prototype_pattern = cv2.resize(masked_similarity_map,
-                                                    dsize=(img_size[1], img_size[0]),
-                                                    interpolation=cv2.INTER_CUBIC)
-                plt.imsave(fname=os.path.join(dir,'%s_masked_upsampled_heatmap.png'%str(decision_node_idx)), arr=upsampled_prototype_pattern, vmin=0.0,vmax=1.0)
+                upsample_similarity_map(
+                    img=x,
+                    similarity_map=sim_maps[j],
+                    decision_node_idx=decision_node_idx,
+                    img_dir=dir,
+                    args=args,
+                    proto_x=prototype_index // W,
+                    proto_y=prototype_index % W
+                )
 
-                high_act_patch_indices = find_high_activation_crop(upsampled_prototype_pattern, args.upsample_threshold)
-                high_act_patch = x_np[high_act_patch_indices[0]:high_act_patch_indices[1],
-                                                    high_act_patch_indices[2]:high_act_patch_indices[3], :]
-                plt.imsave(fname=os.path.join(dir,'%s_nearest_patch_of_image.png'%str(decision_node_idx)), arr=high_act_patch, vmin=0.0,vmax=1.0)
-
-                # save the original image with bounding box showing high activation patch
-                imsave_with_bbox(fname=os.path.join(dir,'%s_bounding_box_nearest_patch_of_image.png'%str(decision_node_idx)),
-                                    img_rgb=x_np,
-                                    bbox_height_start=high_act_patch_indices[0],
-                                    bbox_height_end=high_act_patch_indices[1],
-                                    bbox_width_start=high_act_patch_indices[2],
-                                    bbox_width_end=high_act_patch_indices[3], color=(0, 255, 255))
     return project_info
 
+def upsample_similarity_map (
+        img: Image,
+        similarity_map: np.ndarray,
+        decision_node_idx: int,
+        img_dir: str,
+        args: argparse.Namespace,
+        proto_x: int = None,
+        proto_y: int = None,
+        ):
+
+    x_np = np.asarray(img)
+    x_np = np.float32(x_np)/ 255
+    if x_np.ndim == 2:  # convert grayscale to RGB
+        x_np = np.stack((x_np,)*3, axis=-1)
+    img_size = x_np.shape[:2]
+
+    rescaled_sim_map = similarity_map - np.amin(similarity_map)
+    rescaled_sim_map = rescaled_sim_map / np.amax(rescaled_sim_map)
+    similarity_heatmap = cv2.applyColorMap(np.uint8(255*rescaled_sim_map), cv2.COLORMAP_JET)
+    similarity_heatmap = np.float32(similarity_heatmap) / 255
+    similarity_heatmap = similarity_heatmap[..., ::-1]
+    plt.imsave(
+        fname=os.path.join(img_dir, '%s_heatmap_latent_similaritymap.png' % str(decision_node_idx)),
+        arr=similarity_heatmap,
+        vmin=0.0, vmax=1.0)
+
+    upsampled_act_pattern = cv2.resize(similarity_map, dsize=(img_size[1], img_size[0]), interpolation=cv2.INTER_CUBIC)
+    rescaled_act_pattern = upsampled_act_pattern - np.amin(upsampled_act_pattern)
+    rescaled_act_pattern = rescaled_act_pattern / np.amax(rescaled_act_pattern)
+    heatmap = cv2.applyColorMap(np.uint8(255*rescaled_act_pattern), cv2.COLORMAP_JET)
+    heatmap = np.float32(heatmap) / 255
+    heatmap = heatmap[..., ::-1]
+
+    overlayed_original_img = 0.5 * x_np + 0.2 * heatmap
+    plt.imsave(
+        fname=os.path.join(img_dir, '%s_heatmap_original_image.png' % str(decision_node_idx)),
+        arr=overlayed_original_img,
+        vmin=0.0, vmax=1.0)
+
+
+    # Sanity check when prototype coordinates are known
+    if proto_x is not None and proto_y is not None:
+        masked_similarity_map = np.zeros(similarity_map.shape)
+        masked_similarity_map[proto_x, proto_y] = 1
+    else:
+        # save the highly activated patch
+        masked_similarity_map = np.ones(similarity_map.shape)
+        masked_similarity_map[similarity_map < np.max(similarity_map)] = 0
+
+    upsampled_prototype_pattern = cv2.resize(masked_similarity_map,
+                                             dsize=(img_size[1], img_size[0]),
+                                             interpolation=cv2.INTER_CUBIC)
+    plt.imsave(
+        fname=os.path.join(img_dir, '%s_masked_upsampled_heatmap.png' % str(decision_node_idx)),
+        arr=upsampled_prototype_pattern,
+        vmin=0.0, vmax=1.0)
+
+    threshold = 1-threshold_otsu(upsampled_prototype_pattern) if args.upsample_threshold == "auto" \
+        else float(args.upsample_threshold)
+    high_act_patch_indices = find_high_activation_crop(upsampled_prototype_pattern, threshold)
+    high_act_patch = x_np[
+                     high_act_patch_indices[0]:high_act_patch_indices[1],
+                     high_act_patch_indices[2]:high_act_patch_indices[3],
+                     :]
+    plt.imsave(
+        fname=os.path.join(img_dir, '%s_nearest_patch_of_image.png' % str(decision_node_idx)),
+        arr=high_act_patch,
+        vmin=0.0, vmax=1.0)
+
+    # save the original image with bounding box showing high activation patch
+    imsave_with_bbox(
+        fname=os.path.join(img_dir, '%s_bounding_box_nearest_patch_of_image.png' % str(decision_node_idx)),
+        img_rgb=x_np,
+        bbox_height_start=high_act_patch_indices[0],
+        bbox_height_end=high_act_patch_indices[1],
+        bbox_width_start=high_act_patch_indices[2],
+        bbox_width_end=high_act_patch_indices[3],
+        color=(0, 255, 255))
 
 def get_similarity_maps(tree: ProtoTree, project_info: dict, log: Log = None):
     log.log_message("\nCalculating similarity maps (after projection)...")
