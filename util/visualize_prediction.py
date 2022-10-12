@@ -236,11 +236,12 @@ def gen_pred_vis(tree: ProtoTree,
 
     s += '}\n'
 
-    with open(os.path.join(destination_folder, 'predvis.dot'), 'w') as f:
+    pname = "predvis" if not args.use_smoothgrads else "predvis_sm"
+    with open(os.path.join(destination_folder, f'{pname}.dot'), 'w') as f:
         f.write(s)
 
-    from_p = os.path.join(destination_folder, 'predvis.dot')
-    to_pdf = os.path.join(destination_folder, 'predvis.pdf')
+    from_p = os.path.join(destination_folder, f'{pname}.dot')
+    to_pdf = os.path.join(destination_folder, f'{pname}.pdf')
     check_call('dot -Tpdf -Gmargin=0 %s -o %s' % (from_p, to_pdf), shell=True)
 
 
