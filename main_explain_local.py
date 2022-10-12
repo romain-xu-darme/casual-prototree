@@ -45,9 +45,11 @@ def get_local_expl_args() -> argparse.Namespace:
                         default='upsampling_results',
                         help='Directoy for saving the prototypes, patches and heatmaps')
     parser.add_argument('--upsample_threshold',
-                        type=float,
-                        default=0.98,
-                        help='Threshold (between 0 and 1) for visualizing the nearest patch of an image after upsampling. The higher this threshold, the larger the patches.')
+                        type=str,
+                        default="0.98",
+                        help='Threshold (between 0 and 1) for visualizing the nearest patch of an '
+                             'image after upsampling. The higher this threshold, the larger the patches. '
+                             'If set to "auto", will use Otsu threshold instead.')
     args = parser.parse_args()
     return args
 

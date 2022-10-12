@@ -20,6 +20,7 @@ from prototree.leaf import Leaf
 from prototree.node import Node
 
 from util.gradients import smoothgrads, normalize_min_max
+from skimage.filters import threshold_otsu
 
 
 def smoothgrads_local(
@@ -62,7 +63,8 @@ def smoothgrads_local(
             arr=overlayed_original_img,
             vmin=0.0, vmax=1.0)
 
-        high_act_patch_indices = find_high_activation_crop(grads, args.upsample_threshold)
+        threshold = 1-threshold_otsu(grads) if args.upsample_threshold == "auto" else float(args.upsample_threshold)
+        high_act_patch_indices = find_high_activation_crop(grads, threshold)
         high_act_patch = x_np[high_act_patch_indices[0]:high_act_patch_indices[1],
                          high_act_patch_indices[2]:high_act_patch_indices[3], :]
         plt.imsave(
@@ -133,7 +135,9 @@ def upsample_local(tree: ProtoTree,
                                             interpolation=cv2.INTER_CUBIC)
         plt.imsave(fname=os.path.join(dir,'%s_masked_upsampled_heatmap.png'%str(decision_node_idx)), arr=upsampled_prototype_pattern, vmin=0.0,vmax=1.0)
 
-        high_act_patch_indices = find_high_activation_crop(upsampled_prototype_pattern, args.upsample_threshold)
+        threshold = 1-threshold_otsu(upsampled_prototype_pattern) if args.upsample_threshold == "auto" \
+            else float(args.upsample_threshold)
+        high_act_patch_indices = find_high_activation_crop(upsampled_prototype_pattern, threshold)
         high_act_patch = x_np[high_act_patch_indices[0]:high_act_patch_indices[1],
                                             high_act_patch_indices[2]:high_act_patch_indices[3], :]
         plt.imsave(fname=os.path.join(dir,'%s_nearest_patch_of_image.png'%str(decision_node_idx)), arr=high_act_patch, vmin=0.0,vmax=1.0)
