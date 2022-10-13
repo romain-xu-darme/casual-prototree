@@ -47,8 +47,9 @@ def normalize_min_max(array: np.array) -> np.array:
 
 def smoothgrads(
         tree: ProtoTree,
-        sample: torch.Tensor,
+        img_tensor: torch.Tensor,
         node_id: int,
+        location: Tuple[int] = None,
         device: Optional[str] = 'cpu',
         polarity: Optional[str] = 'absolute',
         gaussian_ksize: Optional[int] = 5,
@@ -59,8 +60,9 @@ def smoothgrads(
     """ Perform patch visualization using SmoothGrad
 
     :param tree: Prototree
-    :param sample: Input image tensor
+    :param img_tensor: Input image tensor
     :param node_id: Node index
+    :param location: Coordinates of feature vector
     :param device: Target device
     :param polarity: Polarity filter applied on gradients
     :param gaussian_ksize: Size of Gaussian filter kernel
@@ -69,17 +71,21 @@ def smoothgrads(
     :param noise: Noise level
     :return: gradient map
     """
-    # Find location of feature vector closest to target node
-    with torch.no_grad():
-        _, distances_batch, _ = tree.forward_partial(sample)
-    distances_batch = distances_batch[0, node_id].cpu().numpy()  # Shape H x W
-    (h, w) = np.where(distances_batch == np.min(distances_batch))
-    h, w = h[0], w[0]
+    if location is None:
+        # Find location of feature vector closest to target node
+        with torch.no_grad():
+            _, distances_batch, _ = tree.forward_partial(img_tensor)
+        distances_batch = distances_batch[0, node_id].cpu().numpy()  # Shape H x W
+        (h, w) = np.where(distances_batch == np.min(distances_batch))
+        h, w = h[0], w[0]
+    else:
+        # Location is predefined
+        h, w = location
 
     # Compute variance from noise ratio
-    sigma = (sample.max() - sample.min()).cpu().numpy() * noise
+    sigma = (img_tensor.max() - img_tensor.min()).cpu().numpy() * noise
     # Generate noisy images around original.
-    noisy_images = [sample + torch.randn(sample.shape).to(device) * sigma for _ in range(nsamples)]
+    noisy_images = [img_tensor + torch.randn(img_tensor.shape).to(device) * sigma for _ in range(nsamples)]
 
     # Compute gradients
     grads = []
@@ -92,7 +98,7 @@ def smoothgrads(
         output.backward(retain_graph=True)
         grads.append(x.grad.data[0].detach().cpu().numpy())
 
-    # grads has shape (nsamples) x sample.shape => average across all samples
+    # grads has shape (nsamples) x img_tensor.shape => average across all samples
     grads = np.mean(np.array(grads), axis=0)
 
     # Post-processing
