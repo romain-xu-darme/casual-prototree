@@ -23,6 +23,9 @@ def get_data(args: argparse.Namespace):
     """
     if args.dataset =='CUB-200-2011':
         return get_birds(True, './data/CUB_200_2011/dataset/train_corners', './data/CUB_200_2011/dataset/train_crop', './data/CUB_200_2011/dataset/test_full')
+    if args.dataset == 'CUB-small':
+        return get_birds(True, './data/CUB_200_2011/dataset/train_crop', './data/CUB_200_2011/dataset/train_crop',
+                         './data/CUB_200_2011/dataset/test_full')
     if args.dataset == 'CARS':
         return get_cars(True, './data/cars/dataset/train', './data/cars/dataset/train', './data/cars/dataset/test')
     raise Exception(f'Could not load data set "{args.dataset}"!')
