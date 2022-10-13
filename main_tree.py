@@ -113,6 +113,9 @@ def run_tree(args=None):
         EVALUATE AND ANALYSE TRAINED TREE
     '''
     log.log_message("Training Finished. Best training accuracy was %s, best test accuracy was %s\n"%(str(best_train_acc), str(best_test_acc)))
+    # Save tree (again)
+    save_tree_description(tree, optimizer, scheduler, "trained", log)
+
     trained_tree = deepcopy(tree)
     leaf_labels = analyse_leafs(tree, epoch+1, len(classes), leaf_labels, args.pruning_threshold_leaves, log)
     analyse_leaf_distributions(tree, log)
