@@ -10,6 +10,11 @@ from torch.utils.data import DataLoader
 from prototree.prototree import ProtoTree
 from util.log import Log
 
+from util.gradients import smoothgrads, normalize_min_max
+from skimage.filters import threshold_otsu
+from typing import Tuple
+
+
 # adapted from protopnet
 def upsample(tree: ProtoTree, project_info: dict, project_loader: DataLoader, folder_name: str, args: argparse.Namespace, log: Log):
     dir = os.path.join(os.path.join(args.log_dir, args.dir_for_saving_images), folder_name)
@@ -36,8 +41,7 @@ def upsample(tree: ProtoTree, project_info: dict, project_loader: DataLoader, fo
                     decision_node_idx=decision_node_idx,
                     img_dir=dir,
                     args=args,
-                    proto_x=prototype_index // W,
-                    proto_y=prototype_index % W
+                    location=(prototype_index // W,prototype_index % W),
                 )
 
     return project_info
@@ -48,8 +52,7 @@ def upsample_similarity_map (
         decision_node_idx: int,
         img_dir: str,
         args: argparse.Namespace,
-        proto_x: int = None,
-        proto_y: int = None,
+        location: Tuple[int, int] = None,
         ):
 
     x_np = np.asarray(img)
@@ -83,9 +86,9 @@ def upsample_similarity_map (
 
 
     # Sanity check when prototype coordinates are known
-    if proto_x is not None and proto_y is not None:
+    if location is not None:
         masked_similarity_map = np.zeros(similarity_map.shape)
-        masked_similarity_map[proto_x, proto_y] = 1
+        masked_similarity_map[location[0], location[1]] = 1
     else:
         # save the highly activated patch
         masked_similarity_map = np.ones(similarity_map.shape)
