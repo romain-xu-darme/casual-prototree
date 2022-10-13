@@ -44,5 +44,7 @@ def save_tree_description(tree: ProtoTree, optimizer, scheduler, description: st
     # Save model with description
     tree.save(f'{log.checkpoint_dir}/'+description)
     tree.save_state(f'{log.checkpoint_dir}/'+description)
-    torch.save(optimizer.state_dict(), f'{log.checkpoint_dir}/'+description+'/optimizer_state.pth')
-    torch.save(scheduler.state_dict(), f'{log.checkpoint_dir}/'+description+'/scheduler_state.pth')
+    if optimizer is not None:
+        torch.save(optimizer.state_dict(), f'{log.checkpoint_dir}/'+description+'/optimizer_state.pth')
+    if scheduler is not None:
+        torch.save(scheduler.state_dict(), f'{log.checkpoint_dir}/'+description+'/scheduler_state.pth')
