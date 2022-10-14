@@ -50,18 +50,14 @@ def get_network(num_in_channels: int, args: argparse.Namespace):
     return features, add_on_layers
 
 def freeze(tree: ProtoTree, epoch: int, params_to_freeze: list, params_to_train: list, args: argparse.Namespace, log: Log):
-    if epoch == 1:
-        # By defaut, everything is trainable
-        for parameter in params_to_train+params_to_freeze:
-                parameter.requires_grad = True
-
-    if args.freeze_epochs>0:
-        if epoch == 1:
-            log.log_message("\nNetwork frozen")
-            for parameter in params_to_freeze:
-                parameter.requires_grad = False
-        elif epoch == args.freeze_epochs + 1:
-            log.log_message("\nNetwork unfrozen")
-            for parameter in params_to_freeze:
-                parameter.requires_grad = True
+    for parameter in params_to_train:
+        parameter.requires_grad = True
+    if args.freeze_epochs > 0 and epoch <= args.freeze_epochs:
+        log.log_message("\nNetwork frozen")
+        for parameter in params_to_freeze:
+            parameter.requires_grad = False
+    else:
+        log.log_message("\nNetwork unfrozen")
+        for parameter in params_to_freeze:
+            parameter.requires_grad = True
 
