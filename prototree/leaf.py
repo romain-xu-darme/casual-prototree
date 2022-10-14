@@ -111,3 +111,16 @@ class Leaf(Node):
     @property
     def depth(self) -> int:
         return 0
+
+    def __eq__(self, other) -> bool:
+        if not other:
+            return False
+        if self._log_probabilities != other._log_probabilities or \
+                self._kontschieder_normalization != other._kontschieder_normalization:
+            return False
+        if (self._dist_params.data != other._dist_params.data).any():
+            return False
+        return True
+
+    def __hash__(self):
+        return hash(self._index)

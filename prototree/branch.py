@@ -121,3 +121,16 @@ class Branch(Node):
     @property
     def depth(self) -> int:
         return self.l.depth + 1
+
+    def __eq__(self, other) -> bool:
+        """ Recursive comparison between trees """
+        if not other:
+            return False
+        if self._log_probabilities != other._log_probabilities:
+            return False
+        if self.num_branches != other.num_branches:
+            return False
+        return self.l == other.l and self.r == other.r
+
+    def __hash__(self):
+        return hash(self._index)

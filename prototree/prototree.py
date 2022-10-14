@@ -354,4 +354,41 @@ class ProtoTree(nn.Module):
             path = [node] + path
         return path
 
+    def __eq__(self, other) -> bool:
+        """ Compare to another ProtoTree
 
+        :param other: Tree to be compared
+        :returns: True if and only if both Prototrees are equivalent
+        """
+        # "Easy" attributes
+        if self._num_classes != other._num_classes \
+                or self.num_features != other.num_features \
+                or self.num_branches != other.num_branches \
+                or self.num_prototypes != other.num_prototypes \
+                or self.prototype_shape != other.prototype_shape \
+                or self._log_probabilities != other._log_probabilities\
+                or self._kontschieder_normalization != other._kontschieder_normalization \
+                or self._kontschieder_train != other._kontschieder_train:
+            return False
+
+        def nn_module_compare(m1 : nn.Module, m2: nn.Module) -> bool:
+            for key1, key2 in zip(m1.state_dict().keys(), m2.state_dict().keys()):
+                if key1 != key2:
+                    return False
+                if (m1.state_dict()[key1] != m2.state_dict()[key2]).any():
+                    return False
+            return True
+
+        if not nn_module_compare(self._net, other._net):
+            return False
+        if not nn_module_compare(self._add_on, other._add_on):
+            return False
+        if not nn_module_compare(self.prototype_layer, other.prototype_layer):
+            return False
+
+        if not self._root == other._root:
+            return False
+        return True
+
+    def __hash__(self):
+        return hash((self._root, self._net, self._add_on, self.prototype_layer))
