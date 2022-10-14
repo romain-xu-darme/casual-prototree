@@ -13,6 +13,7 @@ class Log:
 
         self._log_dir = log_dir
         self._logs = dict()
+        self._mode = mode
 
         # Ensure the directories exist
         if not os.path.isdir(self.log_dir):
@@ -21,7 +22,7 @@ class Log:
             os.mkdir(self.metadata_dir)
         if not os.path.isdir(self.checkpoint_dir):
             os.mkdir(self.checkpoint_dir)
-        open(self.log_dir + '/log.txt', mode).close()
+        open(self.log_dir + '/log.txt', self._mode).close()
 
     @property
     def log_dir(self):
@@ -55,7 +56,7 @@ class Log:
         # Add to existing logs
         self._logs[log_name] = (key_name, value_names)
         # Create log file. Create columns
-        with open(self.log_dir + f'/{log_name}.csv', 'w') as f:
+        with open(self.log_dir + f'/{log_name}.csv', self._mode) as f:
             f.write(','.join((key_name,) + value_names) + '\n')
 
     def log_values(self, log_name, key, *values):
