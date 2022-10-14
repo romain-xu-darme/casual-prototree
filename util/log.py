@@ -9,7 +9,7 @@ class Log:
     Object for managing the log directory
     """
 
-    def __init__(self, log_dir: str):  # Store log in log_dir
+    def __init__(self, log_dir: str, mode: str = 'a'):
 
         self._log_dir = log_dir
         self._logs = dict()
@@ -21,7 +21,7 @@ class Log:
             os.mkdir(self.metadata_dir)
         if not os.path.isdir(self.checkpoint_dir):
             os.mkdir(self.checkpoint_dir)
-        open(self.log_dir + '/log.txt', 'w').close() #make log file empty if it already exists
+        open(self.log_dir + '/log.txt', mode).close()
 
     @property
     def log_dir(self):
