@@ -14,6 +14,9 @@ from prototree.upsample import upsample
 import torch
 from copy import deepcopy
 
+# Use onyl deterministic algorithms
+torch.use_deterministic_algorithms(True)
+
 def run_tree(args=None):
     args = args or get_args()
 

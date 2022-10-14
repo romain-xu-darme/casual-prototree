@@ -1,4 +1,6 @@
 import torch
+import random
+import numpy as np
 import os
 import argparse
 import pickle
@@ -39,11 +41,15 @@ def save_checkpoint(
     torch.save(scheduler.state_dict(), f'{directory_path}/scheduler_state.pth')
     # Save random state
     torch_rng_state = torch.random.get_rng_state()
+    numpy_rng_state = np.random.get_state()
+    python_rng_state = random.getstate()
     stats = {'best_train_acc': best_train_acc,
              'best_test_acc': best_test_acc,
              'leaf_labels': leaf_labels,
              'epoch': epoch,
-             'torch_random_state': torch_rng_state}
+             'torch_random_state': torch_rng_state,
+             'numpy_random_state': numpy_rng_state,
+             'python_random_state': python_rng_state}
     with open(f'{directory_path}/stats.pickle', 'wb') as f:
         pickle.dump(stats, f)
     save_args(args, directory_path)
@@ -77,9 +83,11 @@ def load_checkpoint(directory_path: str) -> \
     # Recover current training stats
     with open(directory_path + '/stats.pickle', 'rb') as f:
         stats = pickle.load(f)
-    best_train_acc, best_test_acc, leaf_labels, epoch, rng_state = tuple(stats.values())
-    # Resume torch random state
-    torch.random.set_rng_state(rng_state)
+    best_train_acc, best_test_acc, leaf_labels, epoch, torch_rng, numpy_rng, python_rng = tuple(stats.values())
+    # Resume random states
+    torch.random.set_rng_state(torch_rng)
+    np.random.set_state(numpy_rng)
+    random.setstate(python_rng)
     print(f"Checkpoint loaded. Epoch: {epoch}, best train acc: {best_train_acc}, best test acc: {best_test_acc}")
     return tree, (optimizer, params_to_freeze, params_to_train), scheduler, \
            (best_train_acc, best_test_acc, leaf_labels, epoch)
