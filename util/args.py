@@ -137,7 +137,15 @@ def get_args() -> argparse.Namespace:
                         type=int,
                         default=5,
                         help='Number of ProtoTrees to train and (optionally) use in an ensemble. Used in main_ensemble.py')
+    parser.add_argument('--random_seed',
+                        type=int,
+                        default=0,
+                        help='Random seed (for reproducibility)')
     args = parser.parse_args()
+    # Init random seeds
+    torch.manual_seed(args.random_seed)
+    np.random.seed(args.random_seed)
+    random.seed(args.random_seed)
     args.milestones = get_milestones(args)
     return args
 
