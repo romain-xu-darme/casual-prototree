@@ -305,8 +305,8 @@ class ProtoTree(nn.Module):
 
 
     @staticmethod
-    def load(directory_path: str):
-        return torch.load(directory_path + '/model.pth')
+    def load(directory_path: str, map_location: str = 'cpu'):
+        return torch.load(directory_path + '/model.pth', map_location=map_location)
 
     def _init_tree(self,
                    num_classes,
