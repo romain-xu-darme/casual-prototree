@@ -1,11 +1,31 @@
 import argparse
 import torch.nn as nn
-import torch.nn.functional as F
 from prototree.prototree import ProtoTree
 from util.log import Log
-from features.resnet_features import resnet18_features, resnet34_features, resnet50_features, resnet50_features_inat, resnet101_features, resnet152_features
-from features.densenet_features import densenet121_features, densenet161_features, densenet169_features, densenet201_features
-from features.vgg_features import vgg11_features, vgg11_bn_features, vgg13_features, vgg13_bn_features, vgg16_features, vgg16_bn_features,vgg19_features, vgg19_bn_features
+from features.resnet_features import (
+    resnet18_features,
+    resnet34_features,
+    resnet50_features,
+    resnet50_features_inat,
+    resnet101_features,
+    resnet152_features,
+)
+from features.densenet_features import (
+    densenet121_features,
+    densenet161_features,
+    densenet169_features,
+    densenet201_features,
+)
+from features.vgg_features import (
+    vgg11_features,
+    vgg11_bn_features,
+    vgg13_features,
+    vgg13_bn_features,
+    vgg16_features,
+    vgg16_bn_features,
+    vgg19_features,
+    vgg19_bn_features,
+)
 
 base_architecture_to_features = {'resnet18': resnet18_features,
                                  'resnet34': resnet34_features,
@@ -30,6 +50,8 @@ base_architecture_to_features = {'resnet18': resnet18_features,
     Create network with pretrained features and 1x1 convolutional layer
 
 """
+
+
 def get_network(num_in_channels: int, args: argparse.Namespace):
     # Define a conv net for estimating the probabilities at each decision node
     features = base_architecture_to_features[args.net](pretrained=not args.disable_pretrained)
@@ -44,12 +66,23 @@ def get_network(num_in_channels: int, args: argparse.Namespace):
         raise Exception('other base base_architecture NOT implemented')
 
     add_on_layers = nn.Sequential(
-                    nn.Conv2d(in_channels=first_add_on_layer_in_channels, out_channels=args.num_features, kernel_size=1, bias=False),
+                    nn.Conv2d(in_channels=first_add_on_layer_in_channels,
+                              out_channels=args.num_features,
+                              kernel_size=1,
+                              bias=False),
                     nn.Sigmoid()
                     )
     return features, add_on_layers
 
-def freeze(tree: ProtoTree, epoch: int, params_to_freeze: list, params_to_train: list, args: argparse.Namespace, log: Log):
+
+def freeze(
+        tree: ProtoTree,
+        epoch: int,
+        params_to_freeze: list,
+        params_to_train: list,
+        args: argparse.Namespace,
+        log: Log
+):
     for parameter in params_to_train:
         parameter.requires_grad = True
     if args.freeze_epochs > 0 and epoch <= args.freeze_epochs:
@@ -60,4 +93,3 @@ def freeze(tree: ProtoTree, epoch: int, params_to_freeze: list, params_to_train:
         log.log_message("\nNetwork unfrozen")
         for parameter in params_to_freeze:
             parameter.requires_grad = True
-

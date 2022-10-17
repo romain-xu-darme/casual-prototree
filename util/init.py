@@ -1,8 +1,8 @@
 import argparse
 import torch
 from prototree.prototree import ProtoTree
-import os
 import pickle
+
 
 def load_state(directory_path: str, device):
     with open(directory_path + '/tree.pkl', 'rb') as f:
@@ -55,9 +55,9 @@ def init_tree(tree: ProtoTree, optimizer, scheduler, device, args: argparse.Name
     elif args.state_dict_dir_net != '': # load pretrained conv network
         # initialize prototypes
         torch.nn.init.normal_(tree.prototype_layer.prototype_vectors, mean=mean, std=std)
-        #strict is False so when loading pretrained model, ignore the linear classification layer
-        tree._net.load_state_dict(torch.load(args.state_dict_dir_net+'/model_state.pth'), strict=False)
-        tree._add_on.load_state_dict(torch.load(args.state_dict_dir_net+'/model_state.pth'), strict=False)
+        # strict is False so when loading pretrained model, ignore the linear classification layer
+        tree._net.load_state_dict(torch.load(args.state_dict_dir_net + '/model_state.pth'), strict=False)
+        tree._add_on.load_state_dict(torch.load(args.state_dict_dir_net + '/model_state.pth'), strict=False)
     else:
         with torch.no_grad():
             # initialize prototypes
@@ -65,9 +65,11 @@ def init_tree(tree: ProtoTree, optimizer, scheduler, device, args: argparse.Name
             tree._add_on.apply(init_weights_xavier)
     return tree, epoch
 
+
 def init_weights_xavier(m):
     if type(m) == torch.nn.Conv2d:
         torch.nn.init.xavier_normal_(m.weight, gain=torch.nn.init.calculate_gain('sigmoid'))
+
 
 def init_weights_kaiming(m):
     if type(m) == torch.nn.Conv2d:

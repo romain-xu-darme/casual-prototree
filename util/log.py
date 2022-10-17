@@ -1,7 +1,7 @@
 import os
 import argparse
+from util.args import save_args
 
-from util.args import save_args, load_args
 
 class Log:
 
@@ -76,4 +76,3 @@ class Log:
 
     def log_args(self, args: argparse.Namespace):
         save_args(args, self._log_dir)
-

@@ -6,30 +6,35 @@ import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
-
 from prototree.prototree import ProtoTree
 from util.log import Log
-
 from util.gradients import smoothgrads, normalize_min_max
 from skimage.filters import threshold_otsu
 from typing import Tuple
 
 
 # adapted from protopnet
-def upsample(tree: ProtoTree, project_info: dict, project_loader: DataLoader, folder_name: str, args: argparse.Namespace, log: Log):
-    dir = os.path.join(os.path.join(args.log_dir, args.dir_for_saving_images), folder_name)
-    if not os.path.exists(dir):
-        os.makedirs(dir)
+def upsample(
+        tree: ProtoTree,
+        project_info: dict,
+        project_loader: DataLoader,
+        folder_name: str,
+        args: argparse.Namespace,
+        log: Log,
+):
+    img_dir = os.path.join(os.path.join(args.log_dir, args.dir_for_saving_images), folder_name)
+    if not os.path.exists(img_dir):
+        os.makedirs(img_dir)
     with torch.no_grad():
         sim_maps, project_info = get_similarity_maps(tree, project_info, log)
         log.log_message("\nUpsampling prototypes for visualization...")
         imgs = project_loader.dataset.imgs
         for node, j in tree._out_map.items():
-            if node in tree.branches: #do not upsample when node is pruned
+            if node in tree.branches:  # do not upsample when node is pruned
                 prototype_info = project_info[j]
                 decision_node_idx = prototype_info['node_ix']
                 x = Image.open(imgs[prototype_info['input_image_ix']][0])
-                x.save(os.path.join(dir,'%s_original_image.png'%str(decision_node_idx)))
+                x.save(os.path.join(img_dir, '%s_original_image.png' % str(decision_node_idx)))
 
                 prototype_index = prototype_info['patch_ix']
                 W, H = prototype_info['W'], prototype_info['H']
@@ -39,24 +44,25 @@ def upsample(tree: ProtoTree, project_info: dict, project_loader: DataLoader, fo
                     img=x,
                     similarity_map=sim_maps[j],
                     decision_node_idx=decision_node_idx,
-                    img_dir=dir,
+                    img_dir=img_dir,
                     args=args,
-                    location=(prototype_index // W,prototype_index % W),
+                    location=(prototype_index // W, prototype_index % W),
                 )
 
     return project_info
 
-def upsample_similarity_map (
+
+def upsample_similarity_map(
         img: Image,
         similarity_map: np.ndarray,
         decision_node_idx: int,
         img_dir: str,
         args: argparse.Namespace,
         location: Tuple[int, int] = None,
-        ):
+):
 
     x_np = np.asarray(img)
-    x_np = np.float32(x_np)/ 255
+    x_np = np.float32(x_np) / 255
     if x_np.ndim == 2:  # convert grayscale to RGB
         x_np = np.stack((x_np,)*3, axis=-1)
     img_size = x_np.shape[:2]
@@ -83,7 +89,6 @@ def upsample_similarity_map (
         fname=os.path.join(img_dir, '%s_heatmap_original_image.png' % str(decision_node_idx)),
         arr=overlayed_original_img,
         vmin=0.0, vmax=1.0)
-
 
     # Sanity check when prototype coordinates are known
     if location is not None:
@@ -124,6 +129,7 @@ def upsample_similarity_map (
         bbox_width_end=high_act_patch_indices[3],
         color=(0, 255, 255))
 
+
 def get_similarity_maps(tree: ProtoTree, project_info: dict, log: Log = None):
     log.log_message("\nCalculating similarity maps (after projection)...")
 
@@ -132,7 +138,7 @@ def get_similarity_maps(tree: ProtoTree, project_info: dict, log: Log = None):
         nearest_x = project_info[j]['nearest_input']
         with torch.no_grad():
             _, distances_batch, _ = tree.forward_partial(nearest_x)
-            sim_maps[j] = torch.exp(-distances_batch[0,j,:,:]).cpu().numpy()
+            sim_maps[j] = torch.exp(-distances_batch[0, j, :, :]).cpu().numpy()
         del nearest_x
         del project_info[j]['nearest_input']
     return sim_maps, project_info
@@ -194,8 +200,9 @@ def smoothgrads_upsample(
 
     threshold = 1-threshold_otsu(grads) if args.upsample_threshold == "auto" else float(args.upsample_threshold)
     high_act_patch_indices = find_high_activation_crop(grads, threshold)
-    high_act_patch = x_np[high_act_patch_indices[0]:high_act_patch_indices[1],
-                     high_act_patch_indices[2]:high_act_patch_indices[3], :]
+    ymin, ymax = high_act_patch_indices[0], high_act_patch_indices[1]
+    xmin, xmax = high_act_patch_indices[2], high_act_patch_indices[3]
+    high_act_patch = x_np[ymin:ymax, xmin:xmax, :]
     plt.imsave(
         fname=os.path.join(img_dir, '%s_nearest_patch_of_image.png' % str(decision_node_idx)),
         arr=high_act_patch,
@@ -226,7 +233,7 @@ def upsample_with_smoothgrads(
     log.log_message("\nUpsampling prototypes for visualization...")
     imgs = project_loader.dataset.imgs
     for node, j in tree._out_map.items():
-        if node in tree.branches: #do not upsample when node is pruned
+        if node in tree.branches:  # do not upsample when node is pruned
             prototype_info = project_info[j]
             decision_node_idx = prototype_info['node_ix']
             x = Image.open(imgs[prototype_info['input_image_ix']][0])
@@ -248,8 +255,9 @@ def upsample_with_smoothgrads(
 
     return project_info
 
+
 # copied from protopnet
-def find_high_activation_crop(mask,threshold):
+def find_high_activation_crop(mask, threshold):
     threshold = 1.-threshold
     lower_y, upper_y, lower_x, upper_x = 0, 0, 0, 0
     for i in range(mask.shape[0]):
@@ -261,14 +269,15 @@ def find_high_activation_crop(mask,threshold):
             upper_y = i
             break
     for j in range(mask.shape[1]):
-        if np.amax(mask[:,j]) > threshold:
+        if np.amax(mask[:, j]) > threshold:
             lower_x = j
             break
     for j in reversed(range(mask.shape[1])):
-        if np.amax(mask[:,j]) > threshold:
+        if np.amax(mask[:, j]) > threshold:
             upper_x = j
             break
     return lower_y, upper_y+1, lower_x, upper_x+1
+
 
 # copied from protopnet
 def imsave_with_bbox(fname, img_rgb, bbox_height_start, bbox_height_end,
@@ -276,8 +285,7 @@ def imsave_with_bbox(fname, img_rgb, bbox_height_start, bbox_height_end,
     img_bgr_uint8 = cv2.cvtColor(np.uint8(255*img_rgb), cv2.COLOR_RGB2BGR)
     cv2.rectangle(img_bgr_uint8, (bbox_width_start, bbox_height_start), (bbox_width_end-1, bbox_height_end-1),
                   color, thickness=2)
-    img_rgb_uint8 = img_bgr_uint8[...,::-1]
+    img_rgb_uint8 = img_bgr_uint8[..., ::-1]
     img_rgb_float = np.float32(img_rgb_uint8) / 255
     plt.imshow(img_rgb_float)
-    #plt.axis('off')
     plt.imsave(fname, img_rgb_float)

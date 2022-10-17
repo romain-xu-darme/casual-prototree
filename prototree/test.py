@@ -1,26 +1,24 @@
 import argparse
 from tqdm import tqdm
 import numpy as np
-
 import torch
-import torch.nn as nn
 import torch.optim
 from torch.utils.data import DataLoader
-
 from prototree.prototree import ProtoTree
 from util.log import Log
+from typing import Any
 
 
 @torch.no_grad()
-def eval(tree: ProtoTree,
+def eval_accuracy(
+        tree: ProtoTree,
         test_loader: DataLoader,
-        epoch,
-        device,
+        epoch: Any,
+        device: str,
         log: Log = None,
         sampling_strategy: str = 'distributed',
-        log_prefix: str = 'log_eval_epochs',
-        progress_prefix: str = 'Eval Epoch'
-        ) -> dict:
+        progress_prefix: str = 'Eval Epoch',
+) -> dict:
     tree = tree.to(device)
 
     # Keep an info dict about the procedure
@@ -34,10 +32,7 @@ def eval(tree: ProtoTree,
     tree.eval()
 
     # Show progress on progress bar
-    test_iter = tqdm(enumerate(test_loader),
-                        total=len(test_loader),
-                        desc=progress_prefix+' %s'%epoch,
-                        ncols=0)
+    test_iter = tqdm(enumerate(test_loader), total=len(test_loader), desc=progress_prefix+' %s' % epoch, ncols=0)
 
     # Iterate through the test set
     for i, (xs, ys) in test_iter:
@@ -66,16 +61,19 @@ def eval(tree: ProtoTree,
 
     info['confusion_matrix'] = cm
     info['test_accuracy'] = acc_from_cm(cm)
-    log.log_message("\nEpoch %s - Test accuracy with %s routing: "%(epoch, sampling_strategy)+str(info['test_accuracy']))
+    log.log_message("\nEpoch %s - Test accuracy with %s routing: "
+                    % (epoch, sampling_strategy)+str(info['test_accuracy']))
     return info
 
+
 @torch.no_grad()
-def eval_fidelity(tree: ProtoTree,
+def eval_fidelity(
+        tree: ProtoTree,
         test_loader: DataLoader,
         device,
         log: Log = None,
-        progress_prefix: str = 'Fidelity'
-        ) -> dict:
+        progress_prefix: str = 'Fidelity',
+) -> dict:
     tree = tree.to(device)
 
     # Keep an info dict about the procedure
@@ -84,10 +82,7 @@ def eval_fidelity(tree: ProtoTree,
     # Make sure the model is in evaluation mode
     tree.eval()
     # Show progress on progress bar
-    test_iter = tqdm(enumerate(test_loader),
-                        total=len(test_loader),
-                        desc=progress_prefix,
-                        ncols=0)
+    test_iter = tqdm(enumerate(test_loader), total=len(test_loader), desc=progress_prefix, ncols=0)
 
     distr_samplemax_fidelity = 0
     distr_greedy_fidelity = 0
@@ -120,22 +115,30 @@ def eval_fidelity(tree: ProtoTree,
     distr_greedy_fidelity = distr_greedy_fidelity/float(len(test_loader.dataset))
     info['distr_samplemax_fidelity'] = distr_samplemax_fidelity
     info['distr_greedy_fidelity'] = distr_greedy_fidelity
-    log.log_message("Fidelity between standard distributed routing and sample_max routing: "+str(distr_samplemax_fidelity))
-    log.log_message("Fidelity between standard distributed routing and greedy routing: "+str(distr_greedy_fidelity))
+    log.log_message("Fidelity between standard distributed routing and sample_max routing: "
+                    + str(distr_samplemax_fidelity))
+    log.log_message("Fidelity between standard distributed routing and greedy routing: "
+                    + str(distr_greedy_fidelity))
     return info
 
+
 @torch.no_grad()
-def eval_ensemble(trees: list, test_loader: DataLoader, device, log: Log, args: argparse.Namespace, sampling_strategy: str = 'distributed', progress_prefix: str = 'Eval Ensemble'):
+def eval_ensemble(
+        trees: list,
+        test_loader: DataLoader,
+        device,
+        log: Log,
+        args: argparse.Namespace,
+        sampling_strategy: str = 'distributed',
+        progress_prefix: str = 'Eval Ensemble'
+):
     # Keep an info dict about the procedure
     info = dict()
     # Build a confusion matrix
     cm = np.zeros((trees[0]._num_classes, trees[0]._num_classes), dtype=int)
 
     # Show progress on progress bar
-    test_iter = tqdm(enumerate(test_loader),
-                        total=len(test_loader),
-                        desc=progress_prefix,
-                        ncols=0)
+    test_iter = tqdm(enumerate(test_loader), total=len(test_loader), desc=progress_prefix, ncols=0)
 
     # Iterate through the test set
     for i, (xs, ys) in test_iter:
@@ -162,8 +165,9 @@ def eval_ensemble(trees: list, test_loader: DataLoader, device, log: Log, args: 
 
     info['confusion_matrix'] = cm
     info['test_accuracy'] = acc_from_cm(cm)
-    log.log_message("Ensemble accuracy with %s routing: %s"%(sampling_strategy, str(info['test_accuracy'])))
+    log.log_message("Ensemble accuracy with %s routing: %s" % (sampling_strategy, str(info['test_accuracy'])))
     return info
+
 
 def acc_from_cm(cm: np.ndarray) -> float:
     """

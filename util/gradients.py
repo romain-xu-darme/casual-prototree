@@ -49,7 +49,7 @@ def smoothgrads(
         tree: ProtoTree,
         img_tensor: torch.Tensor,
         node_id: int,
-        location: Tuple[int] = None,
+        location: Tuple[int, int] = None,
         device: Optional[str] = 'cpu',
         polarity: Optional[str] = 'absolute',
         gaussian_ksize: Optional[int] = 5,

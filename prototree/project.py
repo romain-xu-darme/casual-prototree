@@ -3,9 +3,9 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import numpy as np
-
 from prototree.prototree import ProtoTree
 from util.log import Log
+
 
 def project(tree: ProtoTree,
             project_loader: DataLoader,
@@ -131,11 +131,7 @@ def project_with_class_constraints(tree: ProtoTree,
     W1, H1, D = tree.prototype_shape
 
     # Build a progress bar for showing the status
-    projection_iter = tqdm(enumerate(project_loader),
-                            total=len(project_loader),
-                            desc=progress_prefix,
-                            ncols=0
-                            )
+    projection_iter = tqdm(enumerate(project_loader), total=len(project_loader), desc=progress_prefix, ncols=0)
 
     with torch.no_grad():
         # Get a batch of data
@@ -178,7 +174,7 @@ def project_with_class_constraints(tree: ProtoTree,
                 # - patches: latent patches
                 #   shape: (D, W, H, W1, H1)
                 for batch_i, (distances, patches) in enumerate(zip(distances_batch[:, j, :, :], patches_batch)):
-                    #Check if label of this image is in one of the leaves of the subtree
+                    # Check if label of this image is in one of the leaves of the subtree
                     if ys[batch_i].item() in leaf_labels:
                         # Find the index of the latent patch that is closest to the prototype
                         min_distance = distances.min()
@@ -211,7 +207,7 @@ def project_with_class_constraints(tree: ProtoTree,
 
         # Copy the patches to the prototype layer weights
         projection = torch.cat(tuple(global_min_patches[j].unsqueeze(0) for j in range(tree.num_prototypes)),
-                                dim=0, out=tree.prototype_layer.prototype_vectors)
+                               dim=0, out=tree.prototype_layer.prototype_vectors)
         del projection
 
     return global_min_info, tree

@@ -1,4 +1,4 @@
-from util.args import get_args, save_args, get_optimizer, load_args
+from util.args import get_args
 from util.data import get_dataloaders
 from util.init import init_tree
 from util.net import get_network, freeze
@@ -6,9 +6,9 @@ from util.visualize import gen_vis
 from util.analyse import *
 from util.save import *
 from prototree.train import train_epoch, train_epoch_kontschieder
-from prototree.test import eval, eval_fidelity
+from prototree.test import eval_accuracy, eval_fidelity
 from prototree.prune import prune
-from prototree.project import project, project_with_class_constraints
+from prototree.project import project_with_class_constraints
 from prototree.upsample import upsample
 
 import torch
@@ -17,8 +17,9 @@ from copy import deepcopy
 # Use onyl deterministic algorithms
 torch.use_deterministic_algorithms(True)
 
-def run_tree(args=None):
-    args = args or get_args()
+
+def run_tree():
+    args = get_args()
 
     resume = False
     if (os.path.exists(args.log_dir) and os.path.exists(args.log_dir+'/metadata')
@@ -122,7 +123,7 @@ def run_tree(args=None):
 
             # Evaluate tree
             if args.epochs <= 100 or epoch % 10 == 0 or epoch == args.epochs:
-                eval_info = eval(tree, testloader, epoch, device, log)
+                eval_info = eval_accuracy(tree, testloader, epoch, device, log)
                 original_test_acc = eval_info['test_accuracy']
                 best_test_acc = save_best_test_tree(
                     tree, optimizer, scheduler, epoch,
@@ -133,13 +134,13 @@ def run_tree(args=None):
                 log.log_values('log_epoch_overview', epoch, "n.a.",
                                train_info['train_accuracy'], train_info['loss'])
 
-    else: #tree was loaded and not trained, so evaluate only
+    else:  # tree was loaded and not trained, so evaluate only
         '''
             EVALUATE TREE
         '''
         # Readjust epoch index
         epoch = args.epochs
-        eval_info = eval(tree, testloader, epoch, device, log)
+        eval_info = eval_accuracy(tree, testloader, epoch, device, log)
         original_test_acc = eval_info['test_accuracy']
         best_test_acc = save_best_test_tree(
             tree, optimizer, scheduler, epoch,
@@ -149,7 +150,8 @@ def run_tree(args=None):
     '''
         EVALUATE AND ANALYSE TRAINED TREE
     '''
-    log.log_message("Training Finished. Best training accuracy was %s, best test accuracy was %s\n"%(str(best_train_acc), str(best_test_acc)))
+    log.log_message("Training Finished. Best training accuracy was %s, best test accuracy was %s\n"
+                    % (str(best_train_acc), str(best_test_acc)))
     # Save tree (for sanity checks)
     save_checkpoint(f'{log.checkpoint_dir}/trained',
                     tree, optimizer, scheduler, epoch, best_train_acc, best_test_acc, leaf_labels, args)
@@ -169,7 +171,7 @@ def run_tree(args=None):
     # Analyse and evaluate pruned tree
     leaf_labels = analyse_leafs(tree, epoch+2, len(classes), leaf_labels, args.pruning_threshold_leaves, log)
     analyse_leaf_distributions(tree, log)
-    eval_info = eval(tree, testloader, name, device, log)
+    eval_info = eval_accuracy(tree, testloader, name, device, log)
     pruned_test_acc = eval_info['test_accuracy']
 
     '''
@@ -182,13 +184,13 @@ def run_tree(args=None):
     pruned_projected_tree = deepcopy(tree)
     # Analyse and evaluate pruned tree with projected prototypes
     average_distance_nearest_image(project_info, tree, log)
-    leaf_labels = analyse_leafs(tree, epoch+3, len(classes), leaf_labels, args.pruning_threshold_leaves, log)
+    analyse_leafs(tree, epoch+3, len(classes), leaf_labels, args.pruning_threshold_leaves, log)
     analyse_leaf_distributions(tree, log)
-    eval_info = eval(tree, testloader, name, device, log)
+    eval_info = eval_accuracy(tree, testloader, name, device, log)
     pruned_projected_test_acc = eval_info['test_accuracy']
-    eval_info_samplemax = eval(tree, testloader, name, device, log, 'sample_max')
+    eval_info_samplemax = eval_accuracy(tree, testloader, name, device, log, 'sample_max')
     get_avg_path_length(tree, eval_info_samplemax, log)
-    eval_info_greedy = eval(tree, testloader, name, device, log, 'greedy')
+    eval_info_greedy = eval_accuracy(tree, testloader, name, device, log, 'greedy')
     get_avg_path_length(tree, eval_info_greedy, log)
     fidelity_info = eval_fidelity(tree, testloader, device, log)
 
@@ -203,5 +205,4 @@ def run_tree(args=None):
 
 
 if __name__ == '__main__':
-    args = get_args()
-    run_tree(args)
+    run_tree()

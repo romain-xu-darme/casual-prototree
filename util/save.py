@@ -90,7 +90,7 @@ def load_checkpoint(directory_path: str) -> \
     random.setstate(python_rng)
     print(f"Checkpoint loaded. Epoch: {epoch}, best train acc: {best_train_acc}, best test acc: {best_test_acc}")
     return tree, (optimizer, params_to_freeze, params_to_train), scheduler, \
-           (best_train_acc, best_test_acc, leaf_labels, epoch)
+        (best_train_acc, best_test_acc, leaf_labels, epoch)
 
 
 def save_tree(

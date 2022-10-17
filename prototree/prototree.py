@@ -14,6 +14,7 @@ from util.func import min_pool2d
 
 from util.l2conv import L2Conv2D
 
+
 class ProtoTree(nn.Module):
 
     ARGUMENTS = ['depth', 'num_features', 'W1', 'H1', 'log_probabilities']
@@ -56,7 +57,7 @@ class ProtoTree(nn.Module):
         self._kontschieder_normalization = args.kontschieder_normalization
         self._kontschieder_train = args.kontschieder_train
         # Map each decision node to an output of the feature net
-        self._out_map = {n: i for i, n in zip(range(2 ** (args.depth) - 1), self.branches)}
+        self._out_map = {n: i for i, n in zip(range(2 ** args.depth - 1), self.branches)}
 
         self.prototype_layer = L2Conv2D(self.num_prototypes,
                                         self.num_features,
@@ -303,7 +304,6 @@ class ProtoTree(nn.Module):
         with open(directory_path + '/tree.pkl', 'wb') as f:
             pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-
     @staticmethod
     def load(directory_path: str, map_location: str = 'cpu'):
         return torch.load(directory_path + '/model.pth', map_location=map_location)
@@ -371,7 +371,7 @@ class ProtoTree(nn.Module):
                 or self._kontschieder_train != other._kontschieder_train:
             return False
 
-        def nn_module_compare(m1 : nn.Module, m2: nn.Module) -> bool:
+        def nn_module_compare(m1: nn.Module, m2: nn.Module) -> bool:
             for key1, key2 in zip(m1.state_dict().keys(), m2.state_dict().keys()):
                 if key1 != key2:
                     return False

@@ -1,19 +1,20 @@
 from prototree.prototree import ProtoTree
 from prototree.branch import Branch
-from prototree.leaf import Leaf
 from prototree.node import Node
 from util.log import Log
 from copy import deepcopy
 import torch
+
 
 # Collects the nodes
 def nodes_to_prune_based_on_leaf_dists_threshold(tree: ProtoTree, threshold: float) -> list:
     to_prune_incl_possible_children = []
     for node in tree.nodes:
         if has_max_prob_lower_threshold(node, threshold):
-            #prune everything below incl this node
+            # prune everything below incl this node
             to_prune_incl_possible_children.append(node.index)
     return to_prune_incl_possible_children
+
 
 # Returns True when all the node's children have a max leaf value < threshold
 def has_max_prob_lower_threshold(node: Node, threshold: float):
@@ -82,5 +83,6 @@ def prune(tree: ProtoTree, pruning_threshold_leaves: float, log: Log) -> list:
             else:
                 raise Exception('Pruning went wrong, this should not be possible')
 
-    log.log_message("After pruning: %s branches and %s leaves"%(tree.num_branches,tree.num_leaves))
-    log.log_message("Fraction of prototypes pruned: %s"%((num_prototypes_before-tree.num_branches)/float(num_prototypes_before))+'\n')
+    log.log_message("After pruning: %s branches and %s leaves" % (tree.num_branches, tree.num_leaves))
+    log.log_message("Fraction of prototypes pruned: %s"
+                    % ((num_prototypes_before-tree.num_branches)/float(num_prototypes_before))+'\n')

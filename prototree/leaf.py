@@ -1,10 +1,7 @@
-
 import argparse
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from prototree.node import Node
 
 
@@ -58,7 +55,7 @@ class Leaf(Node):
         # Store leaf distributions as node property
         node_attr[self, 'ds'] = dists
 
-        # Return both the result of the forward pass as well as the node properties
+        # Return both the result of the forward pass and the node properties
         return dists, node_attr
 
     def distribution(self) -> torch.Tensor:
@@ -70,11 +67,12 @@ class Leaf(Node):
                 return F.softmax(self._dist_params - torch.max(self._dist_params), dim=0)
 
         else:
-            #kontschieder_normalization's version that uses a normalization factor instead of softmax:
+            # kontschieder_normalization's version that uses a normalization factor instead of softmax:
             if self._log_probabilities:
-                return torch.log((self._dist_params / torch.sum(self._dist_params))+1e-10) #add small epsilon for numerical stability
+                # add small epsilon for numerical stability
+                return torch.log((self._dist_params / torch.sum(self._dist_params))+1e-10)
             else:
-                return (self._dist_params / torch.sum(self._dist_params))
+                return self._dist_params / torch.sum(self._dist_params)
 
     @property
     def requires_grad(self) -> bool:

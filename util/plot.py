@@ -1,8 +1,5 @@
-import torch
-import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-import pandas as pd
 
 # These are the "Tableau 20" colors as RGB.
 tableau20 = [(31, 119, 180), (174, 199, 232), (255, 127, 14), (255, 187, 120),

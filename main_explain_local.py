@@ -5,12 +5,11 @@ import argparse
 import torch
 import torchvision.transforms as transforms
 from PIL import Image
-from shutil import copy
 from copy import deepcopy
 import os
 
-def get_local_expl_args() -> argparse.Namespace:
 
+def get_local_expl_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser('Explain a prediction')
     parser.add_argument('--prototree',
                         type=str,
@@ -18,7 +17,8 @@ def get_local_expl_args() -> argparse.Namespace:
     parser.add_argument('--log_dir',
                         type=str,
                         default='./runs/run_prototree',
-                        help='The directory in which results should be logged. Should be same log_dir as loaded ProtoTree')
+                        help='The directory in which results should be logged. '
+                             'Should be same log_dir as loaded ProtoTree')
     parser.add_argument('--dataset',
                         type=str,
                         default='CUB-200-2011',
@@ -53,6 +53,7 @@ def get_local_expl_args() -> argparse.Namespace:
     args = parser.parse_args()
     return args
 
+
 def explain_local(args):
     if not args.disable_cuda and torch.cuda.is_available():
         device = torch.device('cuda:{}'.format(torch.cuda.current_device()))
@@ -60,27 +61,26 @@ def explain_local(args):
         device = torch.device('cpu')
 
     # Log which device was actually used
-    print('Device used: ',str(device))
+    print('Device used: ', str(device))
 
     # Load trained ProtoTree
     tree = ProtoTree.load(args.prototree).to(device=device)
     # Obtain the dataset and dataloaders
-    args.batch_size=64 #placeholder
-    args.augment = True #placeholder
+    args.batch_size = 64  # placeholder
+    args.augment = True  # placeholder
     _, _, _, classes, _ = get_dataloaders(args)
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
-    normalize = transforms.Normalize(mean=mean,std=std)
+    normalize = transforms.Normalize(mean=mean, std=std)
     test_transform = transform_no_augment = transforms.Compose([
-                        transforms.Resize(size=(args.image_size, args.image_size)),
-                        transforms.ToTensor(),
-                        normalize
-                    ])
+        transforms.Resize(size=(args.image_size, args.image_size)),
+        transforms.ToTensor(),
+        normalize
+    ])
 
     sample = test_transform(Image.open(args.sample_dir)).unsqueeze(0).to(device)
 
     gen_pred_vis(tree, sample, args.sample_dir, args.results_dir, args, classes)
-
 
 
 if __name__ == '__main__':
@@ -89,14 +89,14 @@ if __name__ == '__main__':
         Image.open(args.sample_dir)
         print("Image to explain: ", args.sample_dir)
         explain_local(args)
-    except: #folder is not image
+    except:  # folder is not image
         class_name = args.sample_dir.split('/')[-1]
-        if not os.path.exists(os.path.join(os.path.join(args.log_dir, args.results_dir),class_name)):
-            os.makedirs(os.path.join(os.path.join(args.log_dir, args.results_dir),class_name))
+        if not os.path.exists(os.path.join(os.path.join(args.log_dir, args.results_dir), class_name)):
+            os.makedirs(os.path.join(os.path.join(args.log_dir, args.results_dir), class_name))
         for filename in os.listdir(args.sample_dir):
             print(filename)
             if filename.endswith(".jpg") or filename.endswith(".png"):
                 args_1 = deepcopy(args)
-                args_1.sample_dir = args.sample_dir+"/"+filename
+                args_1.sample_dir = args.sample_dir + "/" + filename
                 args_1.results_dir = os.path.join(args.results_dir, class_name)
                 explain_local(args_1)
