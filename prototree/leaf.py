@@ -111,7 +111,7 @@ class Leaf(Node):
         return 0
 
     def __eq__(self, other) -> bool:
-        if not other:
+        if not other or other.num_branches > 0:
             return False
         if self._log_probabilities != other._log_probabilities or \
                 self._kontschieder_normalization != other._kontschieder_normalization:
