@@ -39,10 +39,7 @@ def train_epoch(
         eye = torch.eye(tree._num_classes).to(device)
 
     # Show progress on progress bar
-    train_iter = tqdm(enumerate(train_loader),
-                    total=len(train_loader),
-                    desc=progress_prefix+' %s'%epoch,
-                    ncols=0)
+    train_iter = tqdm(enumerate(train_loader), total=len(train_loader), desc=progress_prefix+' %s' % epoch, ncols=0)
     # Iterate through the data set to update leaves, prototypes and network
     for i, (xs, ys) in train_iter:
         # Make sure the model is in train mode
@@ -109,8 +106,8 @@ def train_epoch(
         if log is not None:
             log.log_values(log_loss, epoch, i + 1, loss.item(), acc)
 
-    train_info['loss'] = total_loss/float(i+1)
-    train_info['train_accuracy'] = total_acc/float(i+1)
+    train_info['loss'] = total_loss/nr_batches
+    train_info['train_accuracy'] = total_acc/nr_batches
     return train_info
 
 
@@ -132,6 +129,7 @@ def train_epoch_kontschieder(
     train_info = dict()
     total_loss = 0.
     total_acc = 0.
+    nr_batches = float(len(train_loader))
 
     # Create a log if required
     log_loss = f'{log_prefix}_losses'
@@ -191,8 +189,8 @@ def train_epoch_kontschieder(
         if log is not None:
             log.log_values(log_loss, epoch, i + 1, loss.item(), acc)
 
-    train_info['loss'] = total_loss/float(i+1)
-    train_info['train_accuracy'] = total_acc/float(i+1)
+    train_info['loss'] = total_loss/nr_batches
+    train_info['train_accuracy'] = total_acc/nr_batches
     return train_info
 
 
