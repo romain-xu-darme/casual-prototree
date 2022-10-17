@@ -371,6 +371,9 @@ class ProtoTree(nn.Module):
                 or self._kontschieder_train != other._kontschieder_train:
             return False
 
+        if self._out_map != other._out_map:
+            return False
+
         def nn_module_compare(m1: nn.Module, m2: nn.Module) -> bool:
             for key1, key2 in zip(m1.state_dict().keys(), m2.state_dict().keys()):
                 if key1 != key2:
