@@ -9,7 +9,7 @@ from util.log import Log
 
 def project(tree: ProtoTree,
             project_loader: DataLoader,
-            device,
+            device: str,
             args: argparse.Namespace,
             log: Log,
             log_prefix: str = 'log_projection',  # TODO
@@ -107,14 +107,16 @@ def project(tree: ProtoTree,
 
     return global_min_info, tree
 
-def project_with_class_constraints(tree: ProtoTree,
-                                    project_loader: DataLoader,
-                                    device,
-                                    args: argparse.Namespace,
-                                    log: Log,
-                                    log_prefix: str = 'log_projection_with_constraints',  # TODO
-                                    progress_prefix: str = 'Projection'
-                                    ) -> dict:
+
+def project_with_class_constraints(
+        tree: ProtoTree,
+        project_loader: DataLoader,
+        device: str,
+        args: argparse.Namespace,
+        log: Log,
+        log_prefix: str = 'log_projection_with_constraints',
+        progress_prefix: str = 'Projection'
+) -> dict:
 
     log.log_message("\nProjecting prototypes to nearest training patch (with class restrictions)...")
     # Set the model to evaluation mode

@@ -38,13 +38,12 @@ def run_tree():
     # Log the run arguments
     save_args(args, log.metadata_dir)
     if not args.disable_cuda and torch.cuda.is_available():
-        # device = torch.device('cuda')
-        device = torch.device('cuda:{}'.format(torch.cuda.current_device()))
+        device = 'cuda:{}'.format(torch.cuda.current_device())
     else:
-        device = torch.device('cpu')
+        device = 'cpu'
 
     # Log which device was actually used
-    log.log_message('Device used: '+str(device))
+    log.log_message('Device used: ' + device)
 
     # Create a log for logging the loss values
     log_prefix = 'log_train_epochs'
@@ -62,7 +61,7 @@ def run_tree():
                          feature_net=features_net,
                          args=args,
                          add_on_layers=add_on_layers)
-        tree = tree.to(device=device)
+        tree = tree.to(device)
         # Determine which optimizer should be used to update the tree parameters
         optimizer, params_to_freeze, params_to_train = get_optimizer(tree, args)
         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=args.milestones,
