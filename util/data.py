@@ -18,9 +18,19 @@ def get_data(args: argparse.Namespace):
                 - a tuple containing the shape (depth, width, height) of the input images
     """
     if args.dataset == 'CUB-200-2011':
+        project_path = './data/CUB_200_2011/dataset/'
+        if args.projection_mode == 'corners':
+            # Extract prototypes from training set split into 5 corners
+            project_path += 'train_corners'
+        elif args.projection_mode == "cropped":
+            # Extract prototypes from cropped training set
+            project_path += 'train_crop'
+        else:
+            # Extract prototypes from raw images from the training set
+            project_path += 'train_full'
         return get_birds(True,
                          './data/CUB_200_2011/dataset/train_corners',
-                         './data/CUB_200_2011/dataset/train_crop',
+                         project_path,
                          './data/CUB_200_2011/dataset/test_full')
     if args.dataset == 'CUB-small':
         return get_birds(True,

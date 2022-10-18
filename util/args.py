@@ -141,6 +141,12 @@ def get_args() -> argparse.Namespace:
                              'leaf parameters to a probabilitiy distribution, as done by Kontschieder et al. (2015). '
                              'Will iterate over the data 10 times to update the leaves. Computationally more expensive.'
                         )
+    parser.add_argument('--projection_mode',
+                        type=str,
+                        default='cropped',
+                        choices=['raw', 'cropped', 'corners'],
+                        help='Specify the preprocessing on the training set before projecting prototypes.'
+                        )
     parser.add_argument('--log_probabilities',
                         action='store_true',
                         help='Flag that uses log probabilities when set. Useful when getting NaN values.'
