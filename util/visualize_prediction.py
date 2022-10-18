@@ -78,8 +78,9 @@ def gen_pred_vis(
         os.mkdir(destination_folder + '/node_vis')
 
     # Get references to where source files are stored
-    upsample_path = os.path.join(os.path.join(args.log_dir, args.dir_for_saving_images), 'pruned_and_projected')
-    nodevis_path = os.path.join(args.log_dir, 'pruned_and_projected/node_vis')
+    name = "pruned_and_projected" if not args.use_smoothgrads else "pruned_and_projected_sm"
+    upsample_path = os.path.join(os.path.join(args.log_dir, args.dir_for_saving_images), name)
+    nodevis_path = os.path.join(args.log_dir, f'{name}/node_vis')
     local_upsample_path = os.path.join(destination_folder, args.dir_for_saving_images)
     if args.use_smoothgrads:
         local_upsample_path += "_smoothgrads"
