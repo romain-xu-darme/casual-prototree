@@ -53,7 +53,7 @@ for k in range(num):
         cropped_img.save(os.path.join(os.path.join(test_save_path,file_name),images[k][0].split(' ')[1].split('/')[1]))
         print('%s' % images[k][0].split(' ')[1].split('/')[1])
 
-
+train_full_save_path = os.path.join(path, 'dataset/train_full/')
 train_save_path = os.path.join(path,'dataset/train_corners/')
 test_save_path = os.path.join(path,'dataset/test_full/')
 
@@ -63,6 +63,12 @@ for k in range(num):
     id = int(id)
     file_name = fn.split('/')[0]
     if int(split[k][0][-1]) == 1:
+        if not os.path.isdir(train_full_save_path + file_name):
+            os.makedirs(os.path.join(train_full_save_path, file_name))
+        shutil.copy(path + 'images/' + images[k][0].split(' ')[1],
+                    os.path.join(
+                        os.path.join(train_full_save_path, file_name),
+                        images[k][0].split(' ')[1].split('/')[1]))
 
         if not os.path.isdir(train_save_path + file_name):
             os.makedirs(os.path.join(train_save_path, file_name))
