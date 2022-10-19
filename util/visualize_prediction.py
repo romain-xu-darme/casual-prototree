@@ -78,11 +78,11 @@ def gen_pred_vis(
         os.mkdir(destination_folder + '/node_vis')
 
     # Get references to where source files are stored
-    name = "pruned_and_projected" if not args.use_smoothgrads else "pruned_and_projected_sm"
+    name = "pruned_and_projected" if not args.smoothgrads else "pruned_and_projected_sm"
     upsample_path = os.path.join(os.path.join(args.log_dir, args.dir_for_saving_images), name)
     nodevis_path = os.path.join(args.log_dir, f'{name}/node_vis')
     local_upsample_path = os.path.join(destination_folder, args.dir_for_saving_images)
-    if args.use_smoothgrads:
+    if args.smoothgrads:
         local_upsample_path += "_smoothgrads"
 
     # Get the model prediction
@@ -103,7 +103,7 @@ def gen_pred_vis(
     leaf = tree.nodes_by_index[leaf_ix]
     decision_path = tree.path_to(leaf)
 
-    if args.use_smoothgrads:
+    if args.smoothgrads:
         smoothgrads_local(tree, sample, sample_dir, folder_name, img_name, decision_path, args)
     else:
         upsample_local(tree, sample, sample_dir, folder_name, img_name, decision_path, args)
@@ -147,7 +147,7 @@ def gen_pred_vis(
 
     s += '}\n'
 
-    pname = "predvis" if not args.use_smoothgrads else "predvis_sm"
+    pname = "predvis" if not args.smoothgrads else "predvis_sm"
     with open(os.path.join(destination_folder, f'{pname}.dot'), 'w') as f:
         f.write(s)
 
