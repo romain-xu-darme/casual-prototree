@@ -1,6 +1,7 @@
 from prototree.prototree import ProtoTree
 from util.data import get_dataloaders
 from util.visualize_prediction import gen_pred_vis
+from util.args import *
 import argparse
 import torch
 import torchvision.transforms as transforms
@@ -11,18 +12,10 @@ import os
 
 def get_local_expl_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser('Explain a prediction')
+    add_general_args(parser)
     parser.add_argument('--prototree',
                         type=str,
                         help='Directory to trained ProtoTree')
-    parser.add_argument('--log_dir',
-                        type=str,
-                        default='./runs/run_prototree',
-                        help='The directory in which results should be logged. '
-                             'Should be same log_dir as loaded ProtoTree')
-    parser.add_argument('--dataset',
-                        type=str,
-                        default='CUB-200-2011',
-                        help='Data set on which the ProtoTree was trained')
     parser.add_argument('--sample_dir',
                         type=str,
                         help='Directory to image to be explained, or to a folder containing multiple test images')
@@ -30,28 +23,11 @@ def get_local_expl_args() -> argparse.Namespace:
                         type=str,
                         default='local_explanations',
                         help='Directory where local explanations will be saved')
-    parser.add_argument('--use_smoothgrads',
-                        action='store_true',
-                        help='Use Smoothgrads rather than Cubic interpolation in order to locate patches of images')
-    parser.add_argument('--disable_cuda',
-                        action='store_true',
-                        help='Flag that disables GPU usage if set')
     parser.add_argument('--image_size',
                         type=int,
                         default=224,
                         help='Resize images to this size')
-    parser.add_argument('--dir_for_saving_images',
-                        type=str,
-                        default='upsampling_results',
-                        help='Directoy for saving the prototypes, patches and heatmaps')
-    parser.add_argument('--upsample_threshold',
-                        type=str,
-                        default="0.98",
-                        help='Threshold (between 0 and 1) for visualizing the nearest patch of an '
-                             'image after upsampling. The higher this threshold, the larger the patches. '
-                             'If set to "auto", will use Otsu threshold instead.')
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def explain_local(args):
@@ -66,8 +42,6 @@ def explain_local(args):
     # Load trained ProtoTree
     tree = ProtoTree.load(args.prototree).to(device=device)
     # Obtain the dataset and dataloaders
-    args.batch_size = 64  # placeholder
-    args.augment = True  # placeholder
     _, _, _, classes, _ = get_dataloaders(args)
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)

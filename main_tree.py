@@ -1,4 +1,4 @@
-from util.args import get_args
+from util.args import *
 from util.data import get_dataloaders
 from util.init import init_tree
 from util.net import get_network, freeze
@@ -18,15 +18,23 @@ from copy import deepcopy
 torch.use_deterministic_algorithms(True)
 
 
-def run_tree():
-    args = get_args()
+def create_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser('Train a ProtoTree')
+    add_prototree_init_args(parser)
+    add_general_args(parser)
+    add_training_args(parser)
+    return parser
+
+
+def run_tree(args: argparse.Namespace = None):
+    args = get_args(create_parser()) if args is None else args
 
     resume = False
     if (os.path.exists(args.log_dir) and os.path.exists(args.log_dir+'/metadata')
             and load_args(args.log_dir+'/metadata') == args and os.path.exists(args.log_dir+'/checkpoints/latest')) \
-            or args.state_dict_dir_tree != '':
+            or args.checkpoint != '':
         # Directory already exists and contains the same arguments => resume computation
-        # Alternatively, if state_dict_dir_tree is specified, restart from a given checkpoint
+        # Alternatively, checkpoint can be explicitely specified
         resume = True
 
     # Create a logger
@@ -80,8 +88,8 @@ def run_tree():
             best_train_acc, best_test_acc, leaf_labels, args)
 
     else:
-        # Either latest checkpoint or the one pointed by state_dict_dir_tree
-        directory_path = log.checkpoint_dir+'/latest' if not args.state_dict_dir_tree else args.state_dict_dir_tree
+        # Either latest checkpoint or the one pointed by args
+        directory_path = log.checkpoint_dir+'/latest' if not args.checkpoint else args.checkpoint
         print('Resuming computation from ' + directory_path)
         tree, (optimizer, params_to_freeze, params_to_train), scheduler, stats = \
             load_checkpoint(directory_path)

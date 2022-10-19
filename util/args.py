@@ -13,13 +13,8 @@ from typing import Tuple, List
 """
 
 
-def get_args() -> argparse.Namespace:
-
-    parser = argparse.ArgumentParser('Train a ProtoTree')
-    parser.add_argument('--dataset',
-                        type=str,
-                        default='CUB-200-2011',
-                        help='Data set on which the ProtoTree should be trained')
+def add_prototree_init_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """ Add all options for the initialization of a ProtoTree """
     parser.add_argument('--net',
                         type=str,
                         default='resnet50_inat',
@@ -28,14 +23,108 @@ def get_args() -> argparse.Namespace:
                              'Options are: resnet18, resnet34, resnet50, resnet50_inat, resnet101, resnet152, '
                              'densenet121, densenet169, densenet201, densenet161, '
                              'vgg11, vgg13, vgg16, vgg19, vgg11_bn, vgg13_bn, vgg16_bn or vgg19_bn')
-    parser.add_argument('--batch_size',
-                        type=int,
-                        default=64,
-                        help='Batch size when training the model using minibatch gradient descent')
     parser.add_argument('--depth',
                         type=int,
                         default=9,
                         help='The tree is initialized as a complete tree of this depth')
+    parser.add_argument('--W1',
+                        type=int,
+                        default=1,
+                        help='Width of the prototype. Correct behaviour of the model with W1 != 1 is not guaranteed')
+    parser.add_argument('--H1',
+                        type=int,
+                        default=1,
+                        help='Height of the prototype. Correct behaviour of the model with H1 != 1 is not guaranteed')
+    parser.add_argument('--num_features',
+                        type=int,
+                        default=256,
+                        help='Depth of the prototype and therefore also depth of convolutional output')
+    parser.add_argument('--state_dict_dir_net',
+                        type=str,
+                        default='',
+                        help='The directory containing a state dict with a pretrained backbone network')
+    parser.add_argument('--disable_pretrained',
+                        action='store_true',
+                        help='When set, the backbone network is initialized with random weights (instead of being '
+                             'pretrained on another dataset). When not set, resnet50_inat is initalized with weights '
+                             'from iNaturalist2017. Other networks are initialized with weights from ImageNet'
+                        )
+    parser.add_argument('--disable_derivative_free_leaf_optim',
+                        action='store_true',
+                        help='Flag that optimizes the leafs with gradient descent when set instead of '
+                             'using the derivative-free algorithm'
+                        )
+    parser.add_argument('--kontschieder_train',
+                        action='store_true',
+                        help='Flag that first trains the leaves for one epoch, and then trains the rest of ProtoTree '
+                             '(instead of interleaving leaf and other updates). Computationally more expensive.'
+                        )
+    parser.add_argument('--kontschieder_normalization',
+                        action='store_true',
+                        help='Flag that disables softmax but uses a normalization factor to convert the '
+                             'leaf parameters to a probabilitiy distribution, as done by Kontschieder et al. (2015). '
+                             'Will iterate over the data 10 times to update the leaves. Computationally more expensive.'
+                        )
+    parser.add_argument('--log_probabilities',
+                        action='store_true',
+                        help='Flag that uses log probabilities when set. Useful when getting NaN values.'
+                        )
+    return parser
+
+
+def add_ensemble_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """ Add options for building a tree ensemble """
+    parser.add_argument('--nr_trees_ensemble',
+                        type=int,
+                        default=5,
+                        help='Number of ProtoTrees to train and (optionally) use in an ensemble. '
+                             'Used in main_ensemble.py')
+    return parser
+
+
+def add_general_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """ Add general options that are used in most applications """
+    parser.add_argument('--checkpoint',
+                        type=str,
+                        default='',
+                        help='The directory containing a state dict (checkpoint) with a pretrained prototree. ')
+    parser.add_argument('--dataset',
+                        type=str,
+                        default='CUB-200-2011',
+                        help='Data set on which the ProtoTree should be trained')
+    parser.add_argument('--batch_size',
+                        type=int,
+                        default=64,
+                        help='Batch size when training the model using minibatch gradient descent')
+    parser.add_argument('--disable_cuda',
+                        action='store_true',
+                        help='Flag that disables GPU usage if set')
+    parser.add_argument('--log_dir',
+                        type=str,
+                        default='./runs/run_prototree',
+                        help='The directory in which train progress should be logged')
+    parser.add_argument('--dir_for_saving_images',
+                        type=str,
+                        default='upsampling_results',
+                        help='Directoy for saving the prototypes, patches and heatmaps')
+    parser.add_argument('--upsample_threshold',
+                        type=str,
+                        default="0.98",
+                        help='Threshold (between 0 and 1) for visualizing the nearest patch of an '
+                             'image after upsampling. The higher this threshold, the larger the patches. '
+                             'If set to "auto", will use Otsu threshold instead.')
+    parser.add_argument('--smoothgrads',
+                        action='store_true',
+                        help='Flag that enables use of Smoothgrads for prototype extraction')
+    parser.add_argument('--random_seed',
+                        type=int,
+                        default=0,
+                        help='Random seed (for reproducibility)')
+    return parser
+
+
+def add_training_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """ Add all options for the training of a ProtoTree """
     parser.add_argument('--epochs',
                         type=int,
                         default=100,
@@ -70,25 +159,6 @@ def get_args() -> argparse.Namespace:
                         type=float,
                         default=0.0,
                         help='Weight decay used in the optimizer')
-    parser.add_argument('--disable_cuda',
-                        action='store_true',
-                        help='Flag that disables GPU usage if set')
-    parser.add_argument('--log_dir',
-                        type=str,
-                        default='./runs/run_prototree',
-                        help='The directory in which train progress should be logged')
-    parser.add_argument('--W1',
-                        type=int,
-                        default=1,
-                        help='Width of the prototype. Correct behaviour of the model with W1 != 1 is not guaranteed')
-    parser.add_argument('--H1',
-                        type=int,
-                        default=1,
-                        help='Height of the prototype. Correct behaviour of the model with H1 != 1 is not guaranteed')
-    parser.add_argument('--num_features',
-                        type=int,
-                        default=256,
-                        help='Depth of the prototype and therefore also depth of convolutional output')
     parser.add_argument('--milestones',
                         type=str,
                         default='',
@@ -97,80 +167,34 @@ def get_args() -> argparse.Namespace:
                         type=float,
                         default=0.5,
                         help='The gamma for the MultiStepLR learning rate scheduler. Needs to be 0<=gamma<=1')
-    parser.add_argument('--state_dict_dir_net',
-                        type=str,
-                        default='',
-                        help='The directory containing a state dict with a pretrained backbone network')
-    parser.add_argument('--state_dict_dir_tree',
-                        type=str,
-                        default='',
-                        help='The directory containing a state dict (checkpoint) with a pretrained prototree. ')
     parser.add_argument('--freeze_epochs',
                         type=int,
                         default=2,
                         help='Number of epochs where pretrained features_net will be frozen'
-                        )
-    parser.add_argument('--dir_for_saving_images',
-                        type=str,
-                        default='upsampling_results',
-                        help='Directoy for saving the prototypes, patches and heatmaps')
-    parser.add_argument('--upsample_threshold',
-                        type=float,
-                        default=0.98,
-                        help='Threshold (between 0 and 1) for visualizing the nearest patch of an image '
-                             'after upsampling. The higher this threshold, the larger the patches.')
-    parser.add_argument('--disable_pretrained',
-                        action='store_true',
-                        help='When set, the backbone network is initialized with random weights (instead of being '
-                             'pretrained on another dataset). When not set, resnet50_inat is initalized with weights '
-                             'from iNaturalist2017. Other networks are initialized with weights from ImageNet'
-                        )
-    parser.add_argument('--disable_derivative_free_leaf_optim',
-                        action='store_true',
-                        help='Flag that optimizes the leafs with gradient descent when set instead of '
-                             'using the derivative-free algorithm'
-                        )
-    parser.add_argument('--kontschieder_train',
-                        action='store_true',
-                        help='Flag that first trains the leaves for one epoch, and then trains the rest of ProtoTree '
-                             '(instead of interleaving leaf and other updates). Computationally more expensive.'
-                        )
-    parser.add_argument('--kontschieder_normalization',
-                        action='store_true',
-                        help='Flag that disables softmax but uses a normalization factor to convert the '
-                             'leaf parameters to a probabilitiy distribution, as done by Kontschieder et al. (2015). '
-                             'Will iterate over the data 10 times to update the leaves. Computationally more expensive.'
-                        )
-    parser.add_argument('--projection_mode',
-                        type=str,
-                        default='cropped',
-                        choices=['raw', 'cropped', 'corners'],
-                        help='Specify the preprocessing on the training set before projecting prototypes.'
-                        )
-    parser.add_argument('--log_probabilities',
-                        action='store_true',
-                        help='Flag that uses log probabilities when set. Useful when getting NaN values.'
                         )
     parser.add_argument('--pruning_threshold_leaves',
                         type=float,
                         default=0.01,
                         help='An internal node will be pruned when the maximum class probability in the distributions '
                              'of all leaves below this node are lower than this threshold.')
-    parser.add_argument('--nr_trees_ensemble',
-                        type=int,
-                        default=5,
-                        help='Number of ProtoTrees to train and (optionally) use in an ensemble. '
-                             'Used in main_ensemble.py')
-    parser.add_argument('--random_seed',
-                        type=int,
-                        default=0,
-                        help='Random seed (for reproducibility)')
+    parser.add_argument('--projection_mode',
+                        type=str,
+                        default='cropped',
+                        choices=['raw', 'cropped', 'corners'],
+                        help='Specify the preprocessing on the training set before projecting prototypes.'
+                        )
+    return parser
+
+
+def get_args(parser: argparse.ArgumentParser) -> argparse.Namespace:
     args = parser.parse_args()
-    # Init random seeds
-    torch.manual_seed(args.random_seed)
-    np.random.seed(args.random_seed)
-    random.seed(args.random_seed)
-    args.milestones = get_milestones(args)
+    if hasattr(args, 'random_seed'):
+        # Init random seeds
+        torch.manual_seed(args.random_seed)
+        np.random.seed(args.random_seed)
+        random.seed(args.random_seed)
+    if hasattr(args, 'milestones'):
+        args.milestones = get_milestones(args)
     return args
 
 

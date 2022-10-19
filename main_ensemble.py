@@ -5,7 +5,7 @@ import os
 import numpy as np
 from prototree.prototree import ProtoTree
 from util.log import Log
-from util.args import get_args, save_args, get_optimizer
+from util.args import *
 from util.data import get_dataloaders
 from util.analyse import analyse_ensemble
 
@@ -13,8 +13,18 @@ import gc
 
 from main_tree import run_tree
 
+
+def create_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser('Train an ensemble of ProtoTrees')
+    add_prototree_init_args(parser)
+    add_general_args(parser)
+    add_training_args(parser)
+    add_ensemble_args(parser)
+    return parser
+
+
 def run_ensemble():
-    all_args = get_args()
+    all_args = get_args(create_parser())
     # Create a logger
     log = Log(all_args.log_dir)
     print("Log dir: ", all_args.log_dir, flush=True)
