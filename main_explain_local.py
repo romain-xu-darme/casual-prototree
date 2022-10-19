@@ -46,7 +46,7 @@ def explain_local(args):
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
     normalize = transforms.Normalize(mean=mean, std=std)
-    test_transform = transform_no_augment = transforms.Compose([
+    test_transform = transforms.Compose([
         transforms.Resize(size=(args.image_size, args.image_size)),
         transforms.ToTensor(),
         normalize

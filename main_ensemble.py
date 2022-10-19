@@ -1,16 +1,8 @@
-from shutil import copy
 from copy import deepcopy
-import torch
-import os
-import numpy as np
-from prototree.prototree import ProtoTree
 from util.log import Log
 from util.args import *
 from util.data import get_dataloaders
 from util.analyse import analyse_ensemble
-
-import gc
-
 from main_tree import run_tree
 
 
@@ -32,9 +24,9 @@ def run_ensemble():
     save_args(all_args, log.metadata_dir)
 
     if not all_args.disable_cuda and torch.cuda.is_available():
-        device = torch.device('cuda')
+        device = 'cuda:{}'.format(torch.cuda.current_device())
     else:
-        device = torch.device('cpu')
+        device = 'cpu'
 
     if not os.path.isdir(os.path.join(all_args.log_dir, "files")):
         os.mkdir(os.path.join(all_args.log_dir, "files"))
@@ -55,16 +47,18 @@ def run_ensemble():
     infos_greedy = []
     infos_fidelity = []
     # Train trees in ensemble one by one and save corresponding trees and accuracies
-    for pt in range(1,all_args.nr_trees_ensemble+1):
+    for pt in range(1, all_args.nr_trees_ensemble+1):
         torch.cuda.empty_cache()
 
-        print("\nTraining tree ",pt, "/", all_args.nr_trees_ensemble, flush=True)
-        log.log_message('Training tree %s...'%str(pt))
+        print("\nTraining tree ", pt, "/", all_args.nr_trees_ensemble, flush=True)
+        log.log_message('Training tree %s...' % str(pt))
 
         args = deepcopy(all_args)
-        args.log_dir = os.path.join(log_dir_orig,'tree_'+str(pt))
+        args.log_dir = os.path.join(log_dir_orig, 'tree_'+str(pt))
 
-        trained_tree, pruned_tree, pruned_projected_tree, original_test_acc, pruned_test_acc, pruned_projected_test_acc, project_info, eval_info_samplemax, eval_info_greedy, info_fidelity = run_tree(args)
+        trained_tree, pruned_tree, pruned_projected_tree, \
+            original_test_acc, pruned_test_acc, pruned_projected_test_acc, \
+            project_info, eval_info_samplemax, eval_info_greedy, info_fidelity = run_tree(args)
 
         trained_orig_trees.append(trained_tree)
         trained_pruned_trees.append(pruned_tree)
@@ -80,8 +74,15 @@ def run_ensemble():
         infos_fidelity.append(info_fidelity)
 
         if pt > 1:
-            #analyse ensemble with > 1 trees:
-            analyse_ensemble(log, all_args, test_loader, device, trained_orig_trees, trained_pruned_trees, trained_pruned_projected_trees, orig_test_accuracies, pruned_test_accuracies, pruned_projected_test_accuracies, project_infos, infos_sample_max, infos_greedy, infos_fidelity)
+            # analyse ensemble with > 1 trees:
+            analyse_ensemble(
+                log, all_args,
+                test_loader, device,
+                trained_orig_trees, trained_pruned_trees, trained_pruned_projected_trees,
+                orig_test_accuracies, pruned_test_accuracies, pruned_projected_test_accuracies,
+                project_infos, infos_sample_max, infos_greedy, infos_fidelity
+            )
+
 
 if __name__ == '__main__':
     run_ensemble()
