@@ -203,15 +203,22 @@ def smoothgrads_upsample(
     ymin, ymax = high_act_patch_indices[0], high_act_patch_indices[1]
     xmin, xmax = high_act_patch_indices[2], high_act_patch_indices[3]
     high_act_patch = x_np[ymin:ymax, xmin:xmax, :]
+    if args.refined_bbox:
+        # Expand dimension and filter out low activations
+        grads = np.expand_dims(grads, axis=-1)
+        grads *= (grads > threshold_otsu(grads))
+        high_act_patch = high_act_patch * grads[ymin:ymax, xmin:xmax]
     plt.imsave(
         fname=os.path.join(img_dir, '%s_nearest_patch_of_image.png' % str(decision_node_idx)),
         arr=high_act_patch,
         vmin=0.0, vmax=1.0)
 
+    # In refined mode, mask out low gradients using the heatmap
+    img_rgb = x_np * grads if args.refined_bbox else x_np
     # save the original image with bounding box showing high activation patch
     imsave_with_bbox(
         fname=os.path.join(img_dir, '%s_bounding_box_nearest_patch_of_image.png' % str(decision_node_idx)),
-        img_rgb=x_np,
+        img_rgb=img_rgb,
         bbox_height_start=high_act_patch_indices[0],
         bbox_height_end=high_act_patch_indices[1],
         bbox_width_start=high_act_patch_indices[2],

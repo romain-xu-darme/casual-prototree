@@ -116,6 +116,9 @@ def add_general_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
     parser.add_argument('--smoothgrads',
                         action='store_true',
                         help='Flag that enables use of Smoothgrads for prototype extraction')
+    parser.add_argument('--refined_bbox',
+                        action='store_true',
+                        help='Flag that enables use of refined bounding boxes in Smoothgrads mode')
     parser.add_argument('--random_seed',
                         type=int,
                         default=0,
