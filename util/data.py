@@ -19,7 +19,9 @@ def get_data(args: argparse.Namespace):
     """
     if args.dataset == 'CUB-200-2011':
         project_path = './data/CUB_200_2011/dataset/'
-        if args.projection_mode == 'corners':
+        if not hasattr(args, 'projection_mode'):
+            project_path = None
+        elif args.projection_mode == 'corners':
             # Extract prototypes from training set split into 5 corners
             project_path += 'train_corners'
         elif args.projection_mode == "cropped":
@@ -97,7 +99,7 @@ def get_birds(augment: bool, train_dir: str, project_dir: str, test_dir: str, im
         transform = transform_no_augment
 
     trainset = torchvision.datasets.ImageFolder(train_dir, transform=transform)
-    projectset = torchvision.datasets.ImageFolder(project_dir, transform=transform_no_augment)
+    projectset = torchvision.datasets.ImageFolder(project_dir, transform=transform_no_augment) if project_dir else None
     testset = torchvision.datasets.ImageFolder(test_dir, transform=transform_no_augment)
     classes = trainset.classes
     for i in range(len(classes)):
