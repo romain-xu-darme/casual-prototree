@@ -65,8 +65,8 @@ if __name__ == '__main__':
         explain_local(args)
     except:  # folder is not image
         class_name = args.sample_dir.split('/')[-1]
-        if not os.path.exists(os.path.join(os.path.join(args.log_dir, args.results_dir), class_name)):
-            os.makedirs(os.path.join(os.path.join(args.log_dir, args.results_dir), class_name))
+        if not os.path.exists(os.path.join(os.path.join(args.root_dir, args.results_dir), class_name)):
+            os.makedirs(os.path.join(os.path.join(args.root_dir, args.results_dir), class_name))
         for filename in os.listdir(args.sample_dir):
             print(filename)
             if filename.endswith(".jpg") or filename.endswith(".png"):

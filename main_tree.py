@@ -1,6 +1,5 @@
 from util.args import *
 from util.data import get_dataloaders
-from util.init import init_tree
 from util.net import get_network, freeze
 from util.visualize import gen_vis
 from util.analyse import *
@@ -30,16 +29,16 @@ def run_tree(args: argparse.Namespace = None):
     args = get_args(create_parser()) if args is None else args
 
     resume = False
-    if (os.path.exists(args.log_dir) and os.path.exists(args.log_dir+'/metadata')
-            and load_args(args.log_dir+'/metadata') == args and os.path.exists(args.log_dir+'/checkpoints/latest')) \
+    if (os.path.exists(args.root_dir) and os.path.exists(args.root_dir+'/metadata')
+            and load_args(args.root_dir+'/metadata') == args and os.path.exists(args.root_dir+'/checkpoints/latest')) \
             or args.checkpoint != '':
         # Directory already exists and contains the same arguments => resume computation
         # Alternatively, checkpoint can be explicitely specified
         resume = True
 
     # Create a logger
-    log = Log(args.log_dir, mode='a' if resume else 'w')
-    print("Log dir: ", args.log_dir, flush=True)
+    log = Log(args.root_dir, mode='a' if resume else 'w')
+    print("Log dir: ", args.root_dir, flush=True)
     # Create a csv log for storing the test accuracy, mean train accuracy and mean loss for each epoch
     log.create_log('log_epoch_overview', 'epoch', 'test_acc', 'mean_train_acc',
                    'mean_train_crossentropy_loss_during_epoch')
@@ -59,22 +58,40 @@ def run_tree(args: argparse.Namespace = None):
     log.create_log(log_loss, 'epoch', 'batch', 'loss', 'batch_train_acc')
 
     # Obtain the dataset and dataloaders
-    trainloader, projectloader, testloader, classes, num_channels = get_dataloaders(args)
+    trainloader, projectloader, testloader, classes, num_channels = get_dataloaders(
+        dataset=args.dataset,
+        projection_mode=args.projection_mode,
+        batch_size=args.batch_size,
+        disable_cuda=args.disable_cuda,
+    )
 
     if not resume:
         # Create a convolutional network based on arguments and add 1x1 conv layer
-        features_net, add_on_layers = get_network(num_channels, args)
+        features_net, add_on_layers = get_network(
+            net=args.net,
+            init_mode=args.init_mode,
+            num_features=args.num_features,
+        )
+
         # Create a ProtoTree
-        tree = ProtoTree(num_classes=len(classes),
-                         feature_net=features_net,
-                         args=args,
-                         add_on_layers=add_on_layers)
+        tree = ProtoTree(
+            num_classes=len(classes),
+            depth=args.depth,
+            num_features=args.num_features,
+            features_net=features_net,
+            add_on_layers=add_on_layers,
+            derivative_free=not args.disable_derivative_free_leaf_optim,
+            kontschieder_normalization=args.kontschieder_normalization,
+            kontschieder_train=args.kontschieder_train,
+            log_probabilities=args.log_probabilities,
+            H1=args.H1,
+            W1=args.W1,
+        )
         tree = tree.to(device)
         # Determine which optimizer should be used to update the tree parameters
         optimizer, params_to_freeze, params_to_train = get_optimizer(tree, args)
         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=args.milestones,
                                                          gamma=args.gamma)
-        tree, epoch = init_tree(tree, optimizer, scheduler, device, args)
         log.log_message(
             "Max depth %s, so %s internal nodes and %s leaves" % (args.depth, tree.num_branches, tree.num_leaves))
         analyse_output_shape(tree, trainloader, log, device)
@@ -86,7 +103,7 @@ def run_tree(args: argparse.Namespace = None):
         save_checkpoint(
             f'{log.checkpoint_dir}/tree_init', tree, optimizer, scheduler, 0,
             best_train_acc, best_test_acc, leaf_labels, args)
-
+        epoch = 1
     else:
         # Either latest checkpoint or the one pointed by args
         directory_path = log.checkpoint_dir+'/latest' if not args.checkpoint else args.checkpoint
@@ -104,7 +121,7 @@ def run_tree(args: argparse.Namespace = None):
         for epoch in range(epoch, args.epochs + 1):
             log.log_message("\nEpoch %s" % str(epoch))
             # Freeze (part of) network for some epochs if indicated in args
-            freeze(tree, epoch, params_to_freeze, params_to_train, args, log)
+            freeze(epoch, params_to_freeze, params_to_train, args.freeze_epochs, log)
             log_learning_rates(optimizer, args, log)
 
             # Train tree
@@ -184,7 +201,8 @@ def run_tree(args: argparse.Namespace = None):
     '''
         PROJECT
     '''
-    project_info, tree = project_with_class_constraints(tree, projectloader, device, args, log)
+    proj_dir = os.path.join(args.root_dir, args.proj_dir)
+    project_info, tree = project_with_class_constraints(tree, projectloader, device, log)
     name = "pruned_and_projected"
     save_checkpoint(f'{log.checkpoint_dir}/{name}',
                     tree, optimizer, scheduler, epoch, best_train_acc, best_test_acc, leaf_labels, args)
@@ -202,9 +220,9 @@ def run_tree(args: argparse.Namespace = None):
     fidelity_info = eval_fidelity(tree, testloader, device, log)
 
     # Upsample prototype for visualization
-    project_info = upsample(tree, project_info, projectloader, name, args, log)
+    upsample(tree, project_info, projectloader, os.path.join(proj_dir, "upsampling"), args.upsample_threshold, log)
     # visualize tree
-    gen_vis(tree, name, args, classes)
+    gen_vis(tree, classes, proj_dir)
 
     return trained_tree.to('cpu'), pruned_tree.to('cpu'), pruned_projected_tree.to('cpu'), \
         original_test_acc, pruned_test_acc, pruned_projected_test_acc, \

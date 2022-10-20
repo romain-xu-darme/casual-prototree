@@ -1,21 +1,17 @@
-import argparse
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import numpy as np
 from prototree.prototree import ProtoTree
 from util.log import Log
+from typing import Tuple
 
 
 def project(tree: ProtoTree,
             project_loader: DataLoader,
             device: str,
-            args: argparse.Namespace,
             log: Log,
-            log_prefix: str = 'log_projection',  # TODO
-            progress_prefix: str = 'Projection'
-            ) -> dict:
-
+            ) -> Tuple[dict, ProtoTree]:
     log.log_message("\nProjecting prototypes to nearest training patch (without class restrictions)...")
     # Set the model to evaluation mode
     tree.eval()
@@ -32,11 +28,10 @@ def project(tree: ProtoTree,
 
     # Build a progress bar for showing the status
     projection_iter = tqdm(enumerate(project_loader),
-                            total=len(project_loader),
-                            desc=progress_prefix,
-                            ncols=0
-                            )
-
+                           total=len(project_loader),
+                           desc="Projection",
+                           ncols=0
+                           )
 
     with torch.no_grad():
         # Get a batch of data
@@ -89,7 +84,7 @@ def project(tree: ProtoTree,
                             'W1': W1,
                             'H1': H1,
                             'distance': min_distance.item(),
-                            'nearest_input': torch.unsqueeze(xs[batch_i],0),
+                            'nearest_input': torch.unsqueeze(xs[batch_i], 0),
                             'node_ix': node.index,
                         }
 
@@ -101,8 +96,8 @@ def project(tree: ProtoTree,
             del out_map
         # Copy the patches to the prototype layer weights
         projection = torch.cat(tuple(global_min_patches[j].unsqueeze(0) for j in range(tree.num_prototypes)),
-                                dim=0,
-                                out=tree.prototype_layer.prototype_vectors)
+                               dim=0,
+                               out=tree.prototype_layer.prototype_vectors)
         del projection
 
     return global_min_info, tree
@@ -112,12 +107,8 @@ def project_with_class_constraints(
         tree: ProtoTree,
         project_loader: DataLoader,
         device: str,
-        args: argparse.Namespace,
         log: Log,
-        log_prefix: str = 'log_projection_with_constraints',
-        progress_prefix: str = 'Projection'
-) -> dict:
-
+) -> Tuple[dict, ProtoTree]:
     log.log_message("\nProjecting prototypes to nearest training patch (with class restrictions)...")
     # Set the model to evaluation mode
     tree.eval()
@@ -133,7 +124,7 @@ def project_with_class_constraints(
     W1, H1, D = tree.prototype_shape
 
     # Build a progress bar for showing the status
-    projection_iter = tqdm(enumerate(project_loader), total=len(project_loader), desc=progress_prefix, ncols=0)
+    projection_iter = tqdm(enumerate(project_loader), total=len(project_loader), desc="Projection", ncols=0)
 
     with torch.no_grad():
         # Get a batch of data
@@ -196,7 +187,7 @@ def project_with_class_constraints(
                                 'W1': W1,
                                 'H1': H1,
                                 'distance': min_distance.item(),
-                                'nearest_input': torch.unsqueeze(xs[batch_i],0),
+                                'nearest_input': torch.unsqueeze(xs[batch_i], 0),
                                 'node_ix': node.index,
                             }
 
@@ -211,5 +202,4 @@ def project_with_class_constraints(
         projection = torch.cat(tuple(global_min_patches[j].unsqueeze(0) for j in range(tree.num_prototypes)),
                                dim=0, out=tree.prototype_layer.prototype_vectors)
         del projection
-
     return global_min_info, tree

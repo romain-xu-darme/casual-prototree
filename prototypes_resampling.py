@@ -25,8 +25,8 @@ def prune_and_project():
         raise ValueError('Missing path to training checkpoint.')
 
     # Create/open existing logger
-    log = Log(args.log_dir, mode='a')
-    print("Log dir: ", args.log_dir, flush=True)
+    log = Log(args.root_dir, mode='a')
+    print("Log dir: ", args.root_dir, flush=True)
 
     # GPU management
     if not args.disable_cuda and torch.cuda.is_available():

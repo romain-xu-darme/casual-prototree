@@ -128,7 +128,6 @@ def eval_ensemble(
         test_loader: DataLoader,
         device,
         log: Log,
-        args: argparse.Namespace,
         sampling_strategy: str = 'distributed',
         progress_prefix: str = 'Eval Ensemble'
 ):

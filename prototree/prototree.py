@@ -1,6 +1,4 @@
-
 import os
-import argparse
 import pickle
 import numpy as np
 
@@ -16,29 +14,55 @@ from util.l2conv import L2Conv2D
 
 
 class ProtoTree(nn.Module):
-
     ARGUMENTS = ['depth', 'num_features', 'W1', 'H1', 'log_probabilities']
 
     SAMPLING_STRATEGIES = ['distributed', 'sample_max', 'greedy']
 
     def __init__(self,
                  num_classes: int,
-                 feature_net: torch.nn.Module,
-                 args: argparse.Namespace,
+                 depth: int,
+                 num_features: int,
+                 features_net: torch.nn.Module,
                  add_on_layers: nn.Module = nn.Identity(),
-                 ):
+                 derivative_free: bool = True,
+                 kontschieder_normalization: bool = False,
+                 kontschieder_train: bool = False,
+                 log_probabilities: bool = False,
+                 H1: int = 1,
+                 W1: int = 1,
+                 ) -> None:
+        """ Builds a ProtoTree
+
+        :param num_classes: Number of classes in the classification task
+        :param depth: Maximum tree depth
+        :param num_features: Size of the latent space
+        :param features_net: Feature extractor network
+        :param add_on_layers: Additional convolutional layers for dimensionality reduction
+        :param derivative_free: Use the derivative free leaf optimization strategy
+        :param kontschieder_normalization: Use Kontschieder normalization
+        :param kontschieder_train: Use Kontschieder training
+        :param log_probabilities: Use log of probabilities (improves numerical stability)
+        :param H1: Height of each prototype in the latent space
+        :param W1: Width of each prototype in the latent space
+        """
         super().__init__()
-        assert args.depth > 0
+        assert depth > 0
         assert num_classes > 0
 
         self._num_classes = num_classes
 
         # Build the tree
-        self._root = self._init_tree(num_classes, args)
+        self._root = self._init_tree(
+            num_classes=num_classes,
+            depth=depth,
+            derivative_free=derivative_free,
+            kontschieder_normalization=kontschieder_normalization,
+            log_probabilities=log_probabilities,
+        )
 
-        self.num_features = args.num_features
+        self.num_features = num_features
         self.num_prototypes = self.num_branches
-        self.prototype_shape = (args.W1, args.H1, args.num_features)
+        self.prototype_shape = (W1, H1, num_features)
 
         # Keep a dict that stores a reference to each node's parent
         # Key: node -> Value: the node's parent
@@ -47,22 +71,19 @@ class ProtoTree(nn.Module):
         self._set_parents()  # Traverse the tree to build the self._parents dict
 
         # Set the feature network
-        self._net = feature_net
+        self._net = features_net
         self._add_on = add_on_layers
 
         # Flag that indicates whether probabilities or log probabilities are computed
-        self._log_probabilities = args.log_probabilities
+        self._log_probabilities = log_probabilities
 
         # Flag that indicates whether a normalization factor should be used instead of softmax.
-        self._kontschieder_normalization = args.kontschieder_normalization
-        self._kontschieder_train = args.kontschieder_train
+        self._kontschieder_normalization = kontschieder_normalization
+        self._kontschieder_train = kontschieder_train
         # Map each decision node to an output of the feature net
-        self._out_map = {n: i for i, n in zip(range(2 ** args.depth - 1), self.branches)}
+        self._out_map = {n: i for i, n in zip(range(2 ** depth - 1), self.branches)}
 
-        self.prototype_layer = L2Conv2D(self.num_prototypes,
-                                        self.num_features,
-                                        args.W1,
-                                        args.H1)
+        self.prototype_layer = L2Conv2D(self.num_prototypes, self.num_features, W1, H1)
 
     @property
     def root(self) -> Node:
@@ -308,23 +329,21 @@ class ProtoTree(nn.Module):
     def load(directory_path: str, map_location: str = 'cpu'):
         return torch.load(directory_path + '/model.pth', map_location=map_location)
 
-    def _init_tree(self,
-                   num_classes,
-                   args: argparse.Namespace) -> Node:
+    @staticmethod
+    def _init_tree(
+                   num_classes: int,
+                   depth: int,
+                   derivative_free: bool,
+                   kontschieder_normalization: bool,
+                   log_probabilities: bool,
+                   ) -> Node:
 
         def _init_tree_recursive(i: int, d: int) -> Node:  # Recursively build the tree
-            if d == args.depth:
-                return Leaf(i,
-                            num_classes,
-                            args
-                            )
+            if d == depth:
+                return Leaf(i, num_classes, derivative_free, kontschieder_normalization, log_probabilities)
             else:
                 left = _init_tree_recursive(i + 1, d + 1)
-                return Branch(i,
-                              left,
-                              _init_tree_recursive(i + left.size + 1, d + 1),
-                              args,
-                              )
+                return Branch(i, left, _init_tree_recursive(i + left.size + 1, d + 1), log_probabilities)
 
         return _init_tree_recursive(0, 0)
 
@@ -366,7 +385,7 @@ class ProtoTree(nn.Module):
                 or self.num_branches != other.num_branches \
                 or self.num_prototypes != other.num_prototypes \
                 or self.prototype_shape != other.prototype_shape \
-                or self._log_probabilities != other._log_probabilities\
+                or self._log_probabilities != other._log_probabilities \
                 or self._kontschieder_normalization != other._kontschieder_normalization \
                 or self._kontschieder_train != other._kontschieder_train:
             return False

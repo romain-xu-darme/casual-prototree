@@ -21,6 +21,8 @@ class L2Conv2D(nn.Module):
         # Each prototype is a latent representation of shape (num_features, w_1, h_1)
         prototype_shape = (num_prototypes, num_features, w_1, h_1)
         self.prototype_vectors = nn.Parameter(torch.randn(prototype_shape), requires_grad=True)
+        # Shift initialization of prototypes
+        torch.nn.init.normal_(self.prototype_vectors, mean=0.5, std=0.1)
 
     def forward(self, xs):
         """

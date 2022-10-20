@@ -109,7 +109,7 @@ def save_tree(
                     tree, optimizer, scheduler, epoch, best_train_acc, best_test_acc, leaf_labels, args)
 
     # Save model every 10 epochs
-    if epoch == args.epochs or epoch % 10 == 0:
+    if epoch % 10 == 0:
         save_checkpoint(f'{log.checkpoint_dir}/epoch_{epoch}',
                         tree, optimizer, scheduler, epoch, best_train_acc, best_test_acc, leaf_labels, args)
 

@@ -1,15 +1,24 @@
-import argparse
 import torch
 import torch.optim
 import torch.utils.data
 import torchvision
 import torchvision.transforms as transforms
+from typing import Tuple
 
 
-def get_data(args: argparse.Namespace):
+def get_data(
+        dataset: str,
+        training_mode: str,
+        projection_mode: str = None,
+        dir_path: str = './data',
+) -> Tuple:
     """
     Load the proper dataset based on the parsed arguments
-    :param args: The arguments in which is specified which dataset should be used
+
+    :param dataset: Name of the dataset
+    :param training_mode: Either "corners", "cropped" or "full"
+    :param projection_mode: Either "corners", "cropped" or "raw"
+    :param dir_path: Dataset root directory
     :return: a 5-tuple consisting of:
                 - The train data set
                 - The project data set (usually train data set without augmentation)
@@ -17,55 +26,61 @@ def get_data(args: argparse.Namespace):
                 - a tuple containing all possible class labels
                 - a tuple containing the shape (depth, width, height) of the input images
     """
-    if args.dataset == 'CUB-200-2011':
-        project_path = './data/CUB_200_2011/dataset/'
-        if not hasattr(args, 'projection_mode'):
-            project_path = None
-        elif args.projection_mode == 'corners':
-            # Extract prototypes from training set split into 5 corners
-            project_path += 'train_corners'
-        elif args.projection_mode == "cropped":
-            # Extract prototypes from cropped training set
-            project_path += 'train_crop'
-        else:
-            # Extract prototypes from raw images from the training set
-            project_path += 'train_full'
-        return get_birds(True,
-                         './data/CUB_200_2011/dataset/train_corners',
-                         project_path,
-                         './data/CUB_200_2011/dataset/test_full')
-    if args.dataset == 'CUB-small':
-        return get_birds(True,
-                         './data/CUB_200_2011/dataset/train_crop',
-                         './data/CUB_200_2011/dataset/train_crop',
-                         './data/CUB_200_2011/dataset/test_full')
-    if args.dataset == 'CARS':
-        return get_cars(True, './data/cars/dataset/train', './data/cars/dataset/train', './data/cars/dataset/test')
-    raise Exception(f'Could not load data set "{args.dataset}"!')
+
+    if dataset == 'CUB-200-2011':
+        mode_path = {
+            "corners": dir_path+'/CUB_200_2011/dataset/train_corners',
+            "cropped": dir_path+'/CUB_200_2011/dataset/train_crop',
+            "raw": dir_path+'/CUB_200_2011/dataset/train_full',
+            None: None,
+        }
+        project_path = mode_path[projection_mode]
+        train_path = mode_path[training_mode]
+        return get_birds(augment=True,
+                         train_dir=train_path,
+                         project_dir=project_path,
+                         test_dir=dir_path+'/CUB_200_2011/dataset/test_full')
+    if dataset == 'CUB-small':
+        return get_birds(augment=True,
+                         train_dir=dir_path+'/CUB_200_2011/dataset/train_crop',
+                         project_dir=dir_path+'/CUB_200_2011/dataset/train_crop',
+                         test_dir=dir_path+'/CUB_200_2011/dataset/test_full')
+    if dataset == 'CARS':
+        return get_cars(
+            augment=True,
+            train_dir=dir_path+'/cars/dataset/train',
+            project_dir=dir_path+'/cars/dataset/train',
+            test_dir=dir_path+'/cars/dataset/test')
+    raise Exception(f'Could not load data set "{dataset}"!')
 
 
-def get_dataloaders(args: argparse.Namespace):
+def get_dataloaders(dataset: str, projection_mode: str, batch_size: int, disable_cuda: bool):
     """
     Get data loaders
     """
     # Obtain the dataset
-    trainset, projectset, testset, classes, shape = get_data(args)
+    trainset, projectset, testset, classes, shape = get_data(
+        dataset=dataset,
+        training_mode="corners",
+        projection_mode=projection_mode,
+        dir_path='./data'
+    )
     c, w, h = shape
     # Determine if GPU should be used
-    cuda = not args.disable_cuda and torch.cuda.is_available()
+    cuda = not disable_cuda and torch.cuda.is_available()
     trainloader = torch.utils.data.DataLoader(trainset,
-                                              batch_size=args.batch_size,
+                                              batch_size=batch_size,
                                               shuffle=True,
                                               pin_memory=cuda
                                               )
     # make batch size smaller to prevent out of memory errors during projection
     projectloader = torch.utils.data.DataLoader(projectset,
-                                                batch_size=int(args.batch_size / 4),
+                                                batch_size=int(batch_size / 4),
                                                 shuffle=False,
                                                 pin_memory=cuda
                                                 )
     testloader = torch.utils.data.DataLoader(testset,
-                                             batch_size=args.batch_size,
+                                             batch_size=batch_size,
                                              shuffle=False,
                                              pin_memory=cuda
                                              )

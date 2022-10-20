@@ -18,8 +18,8 @@ def create_parser() -> argparse.ArgumentParser:
 def run_ensemble():
     all_args = get_args(create_parser())
     # Create a logger
-    log = Log(all_args.log_dir)
-    print("Log dir: ", all_args.log_dir, flush=True)
+    log = Log(all_args.root_dir)
+    print("Log dir: ", all_args.root_dir, flush=True)
     # Log the run arguments
     save_args(all_args, log.metadata_dir)
 
@@ -28,13 +28,13 @@ def run_ensemble():
     else:
         device = 'cpu'
 
-    if not os.path.isdir(os.path.join(all_args.log_dir, "files")):
-        os.mkdir(os.path.join(all_args.log_dir, "files"))
+    if not os.path.isdir(os.path.join(all_args.root_dir, "files")):
+        os.mkdir(os.path.join(all_args.root_dir, "files"))
 
     # Obtain the data loaders
     trainloader, projectloader, test_loader, classes, num_channels = get_dataloaders(all_args)
 
-    log_dir_orig = all_args.log_dir
+    root_dir_orig = all_args.root_dir
 
     trained_orig_trees = []
     trained_pruned_trees = []
@@ -54,7 +54,7 @@ def run_ensemble():
         log.log_message('Training tree %s...' % str(pt))
 
         args = deepcopy(all_args)
-        args.log_dir = os.path.join(log_dir_orig, 'tree_'+str(pt))
+        args.root_dir = os.path.join(root_dir_orig, 'tree_'+str(pt))
 
         trained_tree, pruned_tree, pruned_projected_tree, \
             original_test_acc, pruned_test_acc, pruned_projected_test_acc, \

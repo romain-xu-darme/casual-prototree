@@ -10,22 +10,24 @@ class Leaf(Node):
     def __init__(self,
                  index: int,
                  num_classes: int,
-                 args: argparse.Namespace
+                 derivative_free: bool,
+                 kontschieder_normalization: bool,
+                 log_probabilities: bool,
                  ):
         super().__init__(index)
 
         # Initialize the distribution parameters
-        if args.disable_derivative_free_leaf_optim:
+        if not derivative_free:
             self._dist_params = nn.Parameter(torch.randn(num_classes), requires_grad=True)
-        elif args.kontschieder_normalization:
+        elif kontschieder_normalization:
             self._dist_params = nn.Parameter(torch.ones(num_classes), requires_grad=False)
         else:
             self._dist_params = nn.Parameter(torch.zeros(num_classes), requires_grad=False)
 
         # Flag that indicates whether probabilities or log probabilities are computed
-        self._log_probabilities = args.log_probabilities
+        self._log_probabilities = log_probabilities
 
-        self._kontschieder_normalization = args.kontschieder_normalization
+        self._kontschieder_normalization = kontschieder_normalization
 
     def forward(self, xs: torch.Tensor, **kwargs):
 

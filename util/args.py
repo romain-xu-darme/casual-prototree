@@ -39,16 +39,14 @@ def add_prototree_init_args(parser: argparse.ArgumentParser) -> argparse.Argumen
                         type=int,
                         default=256,
                         help='Depth of the prototype and therefore also depth of convolutional output')
-    parser.add_argument('--state_dict_dir_net',
+    parser.add_argument('--init_mode',
                         type=str,
-                        default='',
-                        help='The directory containing a state dict with a pretrained backbone network')
-    parser.add_argument('--disable_pretrained',
-                        action='store_true',
-                        help='When set, the backbone network is initialized with random weights (instead of being '
-                             'pretrained on another dataset). When not set, resnet50_inat is initalized with weights '
-                             'from iNaturalist2017. Other networks are initialized with weights from ImageNet'
-                        )
+                        default=None,
+                        help='Either None, "pretrained", or path to a state dict file. \n'
+                             '- None: the backbone network is initialized with random weights. \n'
+                             '- "pretrained": resnet50_inat is initalized with weights from iNaturalist2017. Other '
+                             'networks are initialized with weights from ImageNet.\n'
+                             'Otherwise, both backbone and add-on layers are initialized with explicit state dict.')
     parser.add_argument('--disable_derivative_free_leaf_optim',
                         action='store_true',
                         help='Flag that optimizes the leafs with gradient descent when set instead of '
@@ -99,14 +97,14 @@ def add_general_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
     parser.add_argument('--disable_cuda',
                         action='store_true',
                         help='Flag that disables GPU usage if set')
-    parser.add_argument('--log_dir',
+    parser.add_argument('--root_dir',
                         type=str,
-                        default='./runs/run_prototree',
-                        help='The directory in which train progress should be logged')
-    parser.add_argument('--dir_for_saving_images',
+                        required=True,
+                        help='Root directory where everything will be saved')
+    parser.add_argument('--proj_dir',
                         type=str,
-                        default='upsampling_results',
-                        help='Directoy for saving the prototypes, patches and heatmaps')
+                        default='projected',
+                        help='Directoy for saving the prototypes, patches and heatmaps (inside root dir)')
     parser.add_argument('--upsample_threshold',
                         type=str,
                         default="0.98",

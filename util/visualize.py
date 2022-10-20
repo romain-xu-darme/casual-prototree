@@ -1,7 +1,6 @@
 import os
 import numpy as np
 import copy
-import argparse
 from subprocess import check_call
 from PIL import Image
 import torch
@@ -12,26 +11,36 @@ from prototree.leaf import Leaf
 from prototree.node import Node
 
 
-def gen_vis(tree: ProtoTree, folder_name: str, args: argparse.Namespace, classes: tuple):
-    destination_folder = os.path.join(args.log_dir, folder_name)
-    upsample_dir = os.path.join(os.path.join(args.log_dir, args.dir_for_saving_images), folder_name)
-    if not os.path.isdir(destination_folder):
-        os.mkdir(destination_folder)
-    if not os.path.isdir(destination_folder + '/node_vis'):
-        os.mkdir(destination_folder + '/node_vis')
+def gen_vis(
+        tree: ProtoTree,
+        classes: tuple,
+        output_dir: str = "pruned_and_projected",
+) -> None:
+    """ Generate visualization of the prototree
+
+    :param tree: ProtoTree
+    :param classes: Tuple containing all classes names
+    :param output_dir: Output directory
+    """
+    upsample_dir = os.path.join(output_dir, "upsampling")
+    node_dir = os.path.join(output_dir, "node_vis")
+    if not os.path.isdir(upsample_dir):
+        os.mkdir(upsample_dir)
+    if not os.path.isdir(node_dir):
+        os.mkdir(node_dir)
 
     with torch.no_grad():
         s = 'digraph T {margin=0;ranksep=".03";nodesep="0.05";splines="false";\n'
         s += 'node [shape=rect, label=""];\n'
-        s += _gen_dot_nodes(tree._root, destination_folder, upsample_dir, classes)
+        s += _gen_dot_nodes(tree._root, node_dir, upsample_dir, classes)
         s += _gen_dot_edges(tree._root, classes)[0]
         s += '}\n'
 
-    with open(os.path.join(destination_folder, 'treevis.dot'), 'w') as f:
+    with open(os.path.join(output_dir, 'treevis.dot'), 'w') as f:
         f.write(s)
 
-    from_p = os.path.join(destination_folder, 'treevis.dot')
-    to_pdf = os.path.join(destination_folder, 'treevis.pdf')
+    from_p = os.path.join(output_dir, 'treevis.dot')
+    to_pdf = os.path.join(output_dir, 'treevis.pdf')
     check_call('dot -Tpdf -Gmargin=0 %s -o %s' % (from_p, to_pdf), shell=True)
 
 
@@ -83,17 +92,15 @@ def _branch_vis(node: Branch, upsample_dir: str):
     w, h = img.size
     wbb, hbb = bb.size
 
-    if wbb < 100 and hbb < 100:
-        cs = wbb, hbb
-    else:
+    if wbb >= 100 or hbb >= 100:
+        # Resize bounding box image while keeping aspect ratio
         cs = 100 / wbb, 100 / hbb
         min_cs = min(cs)
         bb = bb.resize(size=(int(min_cs * wbb), int(min_cs * hbb)))
         wbb, hbb = bb.size
 
-    if w < 100 and h < 100:
-        cs = w, h
-    else:
+    if w >= 100 or h >= 100:
+        # Resize image patch while keeping aspect ratio
         cs = 100 / w, 100 / h
         min_cs = min(cs)
         img = img.resize(size=(int(min_cs * w), int(min_cs * h)))
@@ -110,7 +117,7 @@ def _branch_vis(node: Branch, upsample_dir: str):
     return together
 
 
-def _gen_dot_nodes(node: Node, destination_folder: str, upsample_dir: str, classes: tuple):
+def _gen_dot_nodes(node: Node, node_dir: str, upsample_dir: str, classes: tuple):
     img = _node_vis(node, upsample_dir).convert('RGB')
     if isinstance(node, Leaf):
         if node._log_probabilities:
@@ -125,7 +132,7 @@ def _gen_dot_nodes(node: Node, destination_folder: str, upsample_dir: str, class
             class_targets[i] = classes[t]
         str_targets = ','.join(str(t) for t in class_targets) if len(class_targets) > 0 else ""
         str_targets = str_targets.replace('_', ' ')
-    filename = '{}/node_vis/node_{}_vis.jpg'.format(destination_folder, node.index)
+    filename = '{}/node_{}_vis.jpg'.format(node_dir, node.index)
     img.save(filename)
     if isinstance(node, Leaf):
         s = '{}[imagepos="tc" imagescale=height image="{}" label="{}" ' \
@@ -136,8 +143,8 @@ def _gen_dot_nodes(node: Node, destination_folder: str, upsample_dir: str, class
                                                                                                        node.index)
     if isinstance(node, Branch):
         return s \
-               + _gen_dot_nodes(node.l, destination_folder, upsample_dir, classes) \
-               + _gen_dot_nodes(node.r, destination_folder, upsample_dir, classes)
+               + _gen_dot_nodes(node.l, node_dir, upsample_dir, classes) \
+               + _gen_dot_nodes(node.r, node_dir, upsample_dir, classes)
     if isinstance(node, Leaf):
         return s
 
@@ -146,8 +153,6 @@ def _gen_dot_edges(node: Node, classes: tuple):
     if isinstance(node, Branch):
         edge_l, targets_l = _gen_dot_edges(node.l, classes)
         edge_r, targets_r = _gen_dot_edges(node.r, classes)
-        str_targets_l = ','.join(str(t) for t in targets_l) if len(targets_l) > 0 else ""
-        str_targets_r = ','.join(str(t) for t in targets_r) if len(targets_r) > 0 else ""
         s = '{} -> {} [label="Absent" fontsize=10 tailport="s" headport="n" fontname=Helvetica];\n ' \
             '{} -> {} [label="Present" fontsize=10 tailport="s" headport="n" fontname=Helvetica];\n'.format(
                 node.index, node.l.index,

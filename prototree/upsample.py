@@ -1,6 +1,5 @@
 import os
 import cv2
-import argparse
 import torch
 import numpy as np
 from PIL import Image
@@ -18,11 +17,10 @@ def upsample(
         tree: ProtoTree,
         project_info: dict,
         project_loader: DataLoader,
-        folder_name: str,
-        args: argparse.Namespace,
+        img_dir: str,
+        threshold: str,
         log: Log,
-):
-    img_dir = os.path.join(os.path.join(args.log_dir, args.dir_for_saving_images), folder_name)
+) -> None:
     if not os.path.exists(img_dir):
         os.makedirs(img_dir)
     with torch.no_grad():
@@ -45,11 +43,9 @@ def upsample(
                     similarity_map=sim_maps[j],
                     decision_node_idx=decision_node_idx,
                     img_dir=img_dir,
-                    args=args,
+                    threshold=threshold,
                     location=(prototype_index // W, prototype_index % W),
                 )
-
-    return project_info
 
 
 def upsample_similarity_map(
@@ -57,7 +53,7 @@ def upsample_similarity_map(
         similarity_map: np.ndarray,
         decision_node_idx: int,
         img_dir: str,
-        args: argparse.Namespace,
+        threshold: str,
         location: Tuple[int, int] = None,
 ):
 
@@ -107,8 +103,8 @@ def upsample_similarity_map(
         arr=upsampled_prototype_pattern,
         vmin=0.0, vmax=1.0)
 
-    threshold = 1-threshold_otsu(upsampled_prototype_pattern) if args.upsample_threshold == "auto" \
-        else float(args.upsample_threshold)
+    threshold = 1-threshold_otsu(upsampled_prototype_pattern) if threshold == "auto" \
+        else float(threshold)
     high_act_patch_indices = find_high_activation_crop(upsampled_prototype_pattern, threshold)
     high_act_patch = x_np[
                      high_act_patch_indices[0]:high_act_patch_indices[1],
@@ -151,7 +147,8 @@ def smoothgrads_upsample(
         node: int,
         location: Tuple[int, int] = None,
         img_dir: str = 'upsampling_results',
-        args: argparse.Namespace = None,
+        threshold: str = 'auto',
+        refined_bbox: bool = False,
 ):
     """ Generate visualizations of a particular node on a given image using Smoothgrads
 
@@ -161,7 +158,8 @@ def smoothgrads_upsample(
         :param node: Node index
         :param location: Location inside feature map (do not take vector closest to the node prototype)
         :param img_dir: Output directory for images
-        :param args: Arguments
+        :param threshold: Selection threshold for the visual patches
+        :param refined_bbox: Use gradient x input strategy for more accurate patch visualization
     """
     # Convert image to numpy array
     x_np = np.asarray(img)
@@ -198,12 +196,12 @@ def smoothgrads_upsample(
         arr=overlayed_original_img,
         vmin=0.0, vmax=1.0)
 
-    threshold = 1-threshold_otsu(grads) if args.upsample_threshold == "auto" else float(args.upsample_threshold)
+    threshold = 1-threshold_otsu(grads) if threshold == "auto" else float(threshold)
     high_act_patch_indices = find_high_activation_crop(grads, threshold)
     ymin, ymax = high_act_patch_indices[0], high_act_patch_indices[1]
     xmin, xmax = high_act_patch_indices[2], high_act_patch_indices[3]
     high_act_patch = x_np[ymin:ymax, xmin:xmax, :]
-    if args.refined_bbox:
+    if refined_bbox:
         # Expand dimension and filter out low activations
         grads = np.expand_dims(grads, axis=-1)
         grads *= (grads > threshold_otsu(grads))
@@ -214,7 +212,7 @@ def smoothgrads_upsample(
         vmin=0.0, vmax=1.0)
 
     # In refined mode, mask out low gradients using the heatmap
-    img_rgb = x_np * grads if args.refined_bbox else x_np
+    img_rgb = x_np * grads if refined_bbox else x_np
     # save the original image with bounding box showing high activation patch
     imsave_with_bbox(
         fname=os.path.join(img_dir, '%s_bounding_box_nearest_patch_of_image.png' % str(decision_node_idx)),
@@ -230,10 +228,11 @@ def upsample_with_smoothgrads(
         tree: ProtoTree,
         project_info: dict,
         project_loader: DataLoader,
-        folder_name: str,
-        args: argparse.Namespace,
-        log: Log):
-    img_dir = os.path.join(os.path.join(args.log_dir, args.dir_for_saving_images), folder_name)
+        img_dir: str,
+        log: Log,
+        threshold: str = 'auto',
+        refined_bbox: bool = False,
+) -> None:
     if not os.path.exists(img_dir):
         os.makedirs(img_dir)
 
@@ -257,10 +256,9 @@ def upsample_with_smoothgrads(
                 node=node,
                 location=(prototype_index // W, prototype_index % W),
                 img_dir=img_dir,
-                args=args
+                threshold=threshold,
+                refined_bbox=refined_bbox,
             )
-
-    return project_info
 
 
 # copied from protopnet

@@ -16,7 +16,7 @@ def smoothgrads_local(
         img_name: str,
         decision_path: list,
         args: argparse.Namespace):
-    img_dir = os.path.join(os.path.join(os.path.join(args.log_dir, folder_name), img_name),
+    img_dir = os.path.join(os.path.join(os.path.join(args.root_dir, folder_name), img_name),
                            args.dir_for_saving_images + '_smoothgrads')
     if not os.path.exists(img_dir):
         os.makedirs(img_dir)
@@ -37,7 +37,7 @@ def upsample_local(
         decision_path: list,
         args: argparse.Namespace,
 ):
-    img_dir = os.path.join(os.path.join(os.path.join(args.log_dir, folder_name), img_name), args.dir_for_saving_images)
+    img_dir = os.path.join(os.path.join(os.path.join(args.root_dir, folder_name), img_name), args.dir_for_saving_images)
     if not os.path.exists(img_dir):
         os.makedirs(img_dir)
     with torch.no_grad():
@@ -68,9 +68,9 @@ def gen_pred_vis(
     # Create dir to store visualization
     img_name = sample_dir.split('/')[-1].split(".")[-2]
 
-    if not os.path.exists(os.path.join(args.log_dir, folder_name)):
-        os.makedirs(os.path.join(args.log_dir, folder_name))
-    destination_folder = os.path.join(os.path.join(args.log_dir, folder_name), img_name)
+    if not os.path.exists(os.path.join(args.root_dir, folder_name)):
+        os.makedirs(os.path.join(args.root_dir, folder_name))
+    destination_folder = os.path.join(os.path.join(args.root_dir, folder_name), img_name)
 
     if not os.path.isdir(destination_folder):
         os.mkdir(destination_folder)
@@ -79,8 +79,8 @@ def gen_pred_vis(
 
     # Get references to where source files are stored
     name = "pruned_and_projected" if not args.smoothgrads else "pruned_and_projected_sm"
-    upsample_path = os.path.join(os.path.join(args.log_dir, args.dir_for_saving_images), name)
-    nodevis_path = os.path.join(args.log_dir, f'{name}/node_vis')
+    upsample_path = os.path.join(os.path.join(args.root_dir, args.dir_for_saving_images), name)
+    nodevis_path = os.path.join(args.root_dir, f'{name}/node_vis')
     local_upsample_path = os.path.join(destination_folder, args.dir_for_saving_images)
     if args.smoothgrads:
         local_upsample_path += "_smoothgrads"

@@ -10,14 +10,14 @@ class Branch(Node):
                  index: int,
                  l: Node,
                  r: Node,
-                 args: argparse.Namespace
+                 log_probabilities: bool,
                  ):
         super().__init__(index)
         self.l = l
         self.r = r
 
         # Flag that indicates whether probabilities or log probabilities are computed
-        self._log_probabilities = args.log_probabilities
+        self._log_probabilities = log_probabilities
 
     def forward(self, xs: torch.Tensor, **kwargs):
 
