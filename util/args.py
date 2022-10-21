@@ -188,7 +188,10 @@ def add_training_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParse
                         action='store_true',
                         help='Skip network evaluation after pruning and projection.'
                         )
-
+    parser.add_argument('--force',
+                        action='store_true',
+                        help='Overwrite output directory when it exists.'
+                        )
     return parser
 
 

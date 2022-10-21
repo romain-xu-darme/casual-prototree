@@ -36,6 +36,9 @@ def run_tree(args: argparse.Namespace = None):
         # Alternatively, checkpoint can be explicitely specified
         resume = True
 
+    if os.path.exists(args.root_dir) and not resume and not args.force:
+        raise ValueError(f'Output directory {args.root_dir} already exists. To overwrite, use --force option.')
+
     # Create a logger
     log = Log(args.root_dir, mode='a' if resume else 'w')
     print("Log dir: ", args.root_dir, flush=True)
@@ -164,6 +167,7 @@ def run_tree(args: argparse.Namespace = None):
         '''
         # Readjust epoch index
         epoch = args.epochs
+        original_test_acc = None
         if not args.skip_eval_after_training:
             eval_info = eval_accuracy(tree, testloader, epoch, device, log)
             original_test_acc = eval_info['test_accuracy']
