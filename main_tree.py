@@ -176,10 +176,6 @@ def run_tree(args: argparse.Namespace = None):
     '''
     log.log_message("Training Finished. Best training accuracy was %s, best test accuracy was %s\n"
                     % (str(best_train_acc), str(best_test_acc)))
-    # Save tree (for sanity checks)
-    save_checkpoint(f'{log.checkpoint_dir}/trained',
-                    tree, optimizer, scheduler, epoch, best_train_acc, best_test_acc, leaf_labels, args)
-
     trained_tree = deepcopy(tree)
     leaf_labels = analyse_leafs(tree, epoch+1, len(classes), leaf_labels, args.pruning_threshold_leaves, log)
     analyse_leaf_distributions(tree, log)
