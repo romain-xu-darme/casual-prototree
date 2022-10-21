@@ -184,6 +184,11 @@ def add_training_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParse
                         choices=['raw', 'cropped', 'corners'],
                         help='Specify the preprocessing on the training set before projecting prototypes.'
                         )
+    parser.add_argument('--skip_eval_after_training',
+                        action='store_true',
+                        help='Skip network evaluation after pruning and projection.'
+                        )
+
     return parser
 
 

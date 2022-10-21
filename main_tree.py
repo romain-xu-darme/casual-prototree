@@ -164,12 +164,13 @@ def run_tree(args: argparse.Namespace = None):
         '''
         # Readjust epoch index
         epoch = args.epochs
-        eval_info = eval_accuracy(tree, testloader, epoch, device, log)
-        original_test_acc = eval_info['test_accuracy']
-        best_test_acc = save_best_test_tree(
-            tree, optimizer, scheduler, epoch,
-            best_train_acc, original_test_acc, best_test_acc, leaf_labels, args, log)
-        log.log_values('log_epoch_overview', epoch, original_test_acc, "n.a.", "n.a.")
+        if not args.skip_eval_after_training:
+            eval_info = eval_accuracy(tree, testloader, epoch, device, log)
+            original_test_acc = eval_info['test_accuracy']
+            best_test_acc = save_best_test_tree(
+                tree, optimizer, scheduler, epoch,
+                best_train_acc, original_test_acc, best_test_acc, leaf_labels, args, log)
+            log.log_values('log_epoch_overview', epoch, original_test_acc, "n.a.", "n.a.")
 
     '''
         EVALUATE AND ANALYSE TRAINED TREE
@@ -191,8 +192,10 @@ def run_tree(args: argparse.Namespace = None):
     # Analyse and evaluate pruned tree
     leaf_labels = analyse_leafs(tree, epoch+2, len(classes), leaf_labels, args.pruning_threshold_leaves, log)
     analyse_leaf_distributions(tree, log)
-    eval_info = eval_accuracy(tree, testloader, name, device, log)
-    pruned_test_acc = eval_info['test_accuracy']
+    pruned_test_acc = None
+    if not args.skip_eval_after_training:
+        eval_info = eval_accuracy(tree, testloader, name, device, log)
+        pruned_test_acc = eval_info['test_accuracy']
 
     '''
         PROJECT
@@ -207,13 +210,15 @@ def run_tree(args: argparse.Namespace = None):
     average_distance_nearest_image(project_info, tree, log)
     analyse_leafs(tree, epoch+3, len(classes), leaf_labels, args.pruning_threshold_leaves, log)
     analyse_leaf_distributions(tree, log)
-    eval_info = eval_accuracy(tree, testloader, name, device, log)
-    pruned_projected_test_acc = eval_info['test_accuracy']
-    eval_info_samplemax = eval_accuracy(tree, testloader, name, device, log, 'sample_max')
-    get_avg_path_length(tree, eval_info_samplemax, log)
-    eval_info_greedy = eval_accuracy(tree, testloader, name, device, log, 'greedy')
-    get_avg_path_length(tree, eval_info_greedy, log)
-    fidelity_info = eval_fidelity(tree, testloader, device, log)
+    pruned_projected_test_acc = eval_info_samplemax = eval_info_greedy = fidelity_info = None
+    if not args.skip_eval_after_training:
+        eval_info = eval_accuracy(tree, testloader, name, device, log)
+        pruned_projected_test_acc = eval_info['test_accuracy']
+        eval_info_samplemax = eval_accuracy(tree, testloader, name, device, log, 'sample_max')
+        get_avg_path_length(tree, eval_info_samplemax, log)
+        eval_info_greedy = eval_accuracy(tree, testloader, name, device, log, 'greedy')
+        get_avg_path_length(tree, eval_info_greedy, log)
+        fidelity_info = eval_fidelity(tree, testloader, device, log)
 
     # Upsample prototype for visualization
     upsample(tree, project_info, projectloader, os.path.join(proj_dir, "upsampling"), args.upsample_threshold, log)
