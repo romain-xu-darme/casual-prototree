@@ -54,7 +54,8 @@ def explain_local(args):
 
     sample = test_transform(Image.open(args.sample_dir)).unsqueeze(0).to(device)
 
-    gen_pred_vis(tree, sample, args.sample_dir, args.results_dir, args, classes)
+    gen_pred_vis(
+        tree, sample, args.sample_dir, args.results_dir, args, classes)
 
 
 if __name__ == '__main__':
