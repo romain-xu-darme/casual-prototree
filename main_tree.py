@@ -8,7 +8,7 @@ from prototree.train import train_epoch, train_epoch_kontschieder
 from prototree.test import eval_accuracy, eval_fidelity
 from prototree.prune import prune
 from prototree.project import project_with_class_constraints
-from prototree.upsample import upsample
+from prototree.upsample import upsample, upsample_with_smoothgrads
 
 import torch
 from copy import deepcopy
@@ -221,7 +221,27 @@ def run_tree(args: argparse.Namespace = None):
         fidelity_info = eval_fidelity(tree, testloader, device, log)
 
     # Upsample prototype for visualization
-    upsample(tree, project_info, projectloader, os.path.join(proj_dir, "upsampling"), args.upsample_threshold, log)
+    if args.smoothgrads:
+        upsample_with_smoothgrads(
+            tree=tree,
+            project_info=project_info,
+            project_loader=projectloader,
+            img_dir=os.path.join(proj_dir, "upsampling"),
+            log=log,
+            threshold=args.upsample_threshold,
+            refined_bbox=args.refined_bbox,
+        )
+    else:
+        upsample(
+            tree=tree,
+            project_info=project_info,
+            project_loader=projectloader,
+            img_dir=os.path.join(proj_dir, "upsampling"),
+            log=log,
+            threshold=args.upsample_threshold,
+        )
+    # Save projection file
+    torch.save(project_info, os.path.join(proj_dir, 'projection.pth'))
     # visualize tree
     gen_vis(tree, classes, proj_dir)
 
