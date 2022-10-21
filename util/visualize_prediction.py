@@ -17,7 +17,7 @@ def smoothgrads_local(
         decision_path: list,
         args: argparse.Namespace):
     img_dir = os.path.join(os.path.join(os.path.join(args.root_dir, folder_name), img_name),
-                           args.dir_for_saving_images + '_smoothgrads')
+                           args.results_dir + '_smoothgrads')
     if not os.path.exists(img_dir):
         os.makedirs(img_dir)
 
@@ -25,7 +25,13 @@ def smoothgrads_local(
 
     for i, node in enumerate(decision_path[:-1]):
         smoothgrads_upsample(
-            tree=tree, img=img, img_tensor=sample, node=node, location=None, img_dir=img_dir, args=args)
+            tree=tree,
+            img=img, img_tensor=sample,
+            node=node, location=None,
+            img_dir=img_dir,
+            threshold=args.upsample_threshold,
+            refined_bbox=args.refined_bbox,
+        )
 
 
 def upsample_local(
@@ -37,7 +43,7 @@ def upsample_local(
         decision_path: list,
         args: argparse.Namespace,
 ):
-    img_dir = os.path.join(os.path.join(os.path.join(args.root_dir, folder_name), img_name), args.dir_for_saving_images)
+    img_dir = os.path.join(os.path.join(os.path.join(args.root_dir, folder_name), img_name), args.results_dir)
     if not os.path.exists(img_dir):
         os.makedirs(img_dir)
     with torch.no_grad():
@@ -79,9 +85,9 @@ def gen_pred_vis(
 
     # Get references to where source files are stored
     name = "pruned_and_projected" if not args.smoothgrads else "pruned_and_projected_sm"
-    upsample_path = os.path.join(os.path.join(args.root_dir, args.dir_for_saving_images), name)
+    upsample_path = os.path.join(os.path.join(args.root_dir, args.results_dir), name)
     nodevis_path = os.path.join(args.root_dir, f'{name}/node_vis')
-    local_upsample_path = os.path.join(destination_folder, args.dir_for_saving_images)
+    local_upsample_path = os.path.join(destination_folder, args.results_dir)
     if args.smoothgrads:
         local_upsample_path += "_smoothgrads"
 

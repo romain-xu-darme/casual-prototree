@@ -42,7 +42,12 @@ def explain_local(args):
     # Load trained ProtoTree
     tree = ProtoTree.load(args.prototree).to(device=device)
     # Obtain the dataset and dataloaders
-    _, _, _, classes, _ = get_dataloaders(args)
+    _, _, _, classes, _ = get_dataloaders(
+        dataset=args.dataset,
+        projection_mode=None,
+        batch_size=args.batch_size,
+        disable_cuda=args.disable_cuda,
+    )
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
     normalize = transforms.Normalize(mean=mean, std=std)
