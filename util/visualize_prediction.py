@@ -8,8 +8,8 @@ from prototree.prototree import ProtoTree
 
 def upsample_local(
         tree: ProtoTree,
-        sample: torch.Tensor,
-        sample_dir: str,
+        img_tensor: torch.Tensor,
+        img_path: str,
         output_dir: str,
         decision_path: list,
         threshold: str,
@@ -19,8 +19,8 @@ def upsample_local(
     """ Given a test sample, compute and store visual representation of parts similar to prototypes
 
     :param tree: ProtoTree
-    :param sample: Input image tensor
-    :param sample_dir: Directory containing the original image
+    :param img_tensor: Input image tensor
+    :param img_path: Path to the original image
     :param output_dir: Directory where to store the visualization
     :param decision_path: List of main nodes leading to the prediction
     :param threshold: Upsampling threshold
@@ -33,8 +33,8 @@ def upsample_local(
     for node in decision_path[:-1]:
         upsample_similarity_map(
             tree=tree,
-            img=Image.open(sample_dir),
-            img_tensor=sample,
+            img=Image.open(img_path),
+            img_tensor=img_tensor,
             node_id=tree._out_map[node],
             node_name=node.index,
             output_dir=output_dir,
@@ -47,8 +47,8 @@ def upsample_local(
 
 def gen_pred_vis(
         tree: ProtoTree,
-        sample: torch.Tensor,
-        sample_dir: str,
+        img_tensor: torch.Tensor,
+        img_path: str,
         proj_dir: str,
         output_dir: str,
         classes: tuple,
@@ -59,8 +59,8 @@ def gen_pred_vis(
     """ Generate prediction visualization
 
     :param tree: ProtoTree
-    :param sample: Input image tensor
-    :param sample_dir: Directory containing the original image
+    :param img_tensor: Input image tensor
+    :param img_path: Path to the original image
     :param proj_dir: Directory containing the prototypes projection and visualizations
     :param output_dir: Directory where to store the visualization
     :param classes: Class labels
@@ -71,7 +71,7 @@ def gen_pred_vis(
     assert upsample_mode in ['vanilla', 'smoothgrads'], f'Unsupported upsample mode {upsample_mode}'
 
     # Create directory to store visualization
-    img_name = sample_dir.split('/')[-1].split(".")[-2]
+    img_name = img_path.split('/')[-1].split(".")[-2]
     output_dir = os.path.join(output_dir, img_name)
     if not os.path.isdir(output_dir):
         os.mkdir(output_dir)
@@ -80,14 +80,14 @@ def gen_pred_vis(
     # Get the model prediction
     with torch.no_grad():
         pred_kwargs = dict()
-        pred, pred_info = tree.forward(sample, sampling_strategy='greedy', **pred_kwargs)
+        pred, pred_info = tree.forward(img_tensor, sampling_strategy='greedy', **pred_kwargs)
         probs = pred_info['ps']
         label_ix = torch.argmax(pred, dim=1)[0].item()
         assert 'out_leaf_ix' in pred_info.keys()
 
     # Copy input image
     sample_path = os.path.join(output_dir, 'sample.jpg')
-    Image.open(sample_dir).save(sample_path)
+    Image.open(img_path).save(sample_path)
 
     leaf_ix = pred_info['out_leaf_ix'][0]
     leaf = tree.nodes_by_index[leaf_ix]
@@ -95,8 +95,8 @@ def gen_pred_vis(
 
     upsample_local(
         tree=tree,
-        sample=sample,
-        sample_dir=sample_dir,
+        img_tensor=img_tensor,
+        img_path=img_path,
         output_dir=local_upsample_path,
         decision_path=decision_path,
         threshold=upsample_threshold,

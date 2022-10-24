@@ -6,7 +6,6 @@ import argparse
 import torch
 import torchvision.transforms as transforms
 from PIL import Image
-from copy import deepcopy
 import os
 
 
@@ -30,7 +29,9 @@ def get_local_expl_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def explain_local(args):
+if __name__ == '__main__':
+    args = get_local_expl_args()
+
     if not args.disable_cuda and torch.cuda.is_available():
         device = torch.device('cuda:{}'.format(torch.cuda.current_device()))
     else:
@@ -57,34 +58,28 @@ def explain_local(args):
         normalize
     ])
 
-    sample = test_transform(Image.open(args.sample_dir)).unsqueeze(0).to(device)
-
-    gen_pred_vis(
-        tree=tree,
-        sample=sample, sample_dir=args.sample_dir,
-        proj_dir=os.path.join(args.root_dir,args.proj_dir),
-        output_dir=os.path.join(args.root_dir, args.results_dir),
-        classes=classes,
-        upsample_threshold=args.upsample_threshold,
-        upsample_mode=args.upsample_mode,
-        grads_x_input=args.grads_x_input,
-    )
-
-
-if __name__ == '__main__':
-    args = get_local_expl_args()
-    try:
-        Image.open(args.sample_dir)
-        print("Image to explain: ", args.sample_dir)
-        explain_local(args)
-    except:  # folder is not image
-        class_name = args.sample_dir.split('/')[-1]
+    img_list = []
+    if os.path.isdir(args.sample_dir):
+        class_name = args.sample_dir.strip('/').split('/')[-1]
         if not os.path.exists(os.path.join(os.path.join(args.root_dir, args.results_dir), class_name)):
             os.makedirs(os.path.join(os.path.join(args.root_dir, args.results_dir), class_name))
         for filename in os.listdir(args.sample_dir):
-            print(filename)
             if filename.endswith(".jpg") or filename.endswith(".png"):
-                args_1 = deepcopy(args)
-                args_1.sample_dir = args.sample_dir + "/" + filename
-                args_1.results_dir = os.path.join(args.results_dir, class_name)
-                explain_local(args_1)
+                img_list.append((os.path.join(args.sample_dir, filename), os.path.join(args.results_dir, class_name)))
+    else:
+        if args.sample_dir.endswith(".jpg") or args.sample_dir.endswith(".png"):
+            img_list.append((args.sample_dir, args.results_dir))
+
+    for img_path, output_path in img_list:
+        print(img_path, output_path)
+        gen_pred_vis(
+            tree=tree,
+            img_tensor=test_transform(Image.open(img_path)).unsqueeze(0).to(device),
+            img_path=img_path,
+            proj_dir=os.path.join(args.root_dir, args.proj_dir),
+            output_dir=os.path.join(args.root_dir, output_path),
+            classes=classes,
+            upsample_threshold=args.upsample_threshold,
+            upsample_mode=args.upsample_mode,
+            grads_x_input=args.grads_x_input,
+        )
