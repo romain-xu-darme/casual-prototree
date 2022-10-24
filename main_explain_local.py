@@ -60,7 +60,15 @@ def explain_local(args):
     sample = test_transform(Image.open(args.sample_dir)).unsqueeze(0).to(device)
 
     gen_pred_vis(
-        tree, sample, args.sample_dir, args.results_dir, args, classes)
+        tree=tree,
+        sample=sample, sample_dir=args.sample_dir,
+        proj_dir=os.path.join(args.root_dir,args.proj_dir),
+        output_dir=os.path.join(args.root_dir, args.results_dir),
+        classes=classes,
+        upsample_threshold=args.upsample_threshold,
+        upsample_mode=args.upsample_mode,
+        grads_x_input=args.grads_x_input,
+    )
 
 
 if __name__ == '__main__':

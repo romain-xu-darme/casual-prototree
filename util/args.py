@@ -111,12 +111,14 @@ def add_general_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
                         help='Threshold (between 0 and 1) for visualizing the nearest patch of an '
                              'image after upsampling. The higher this threshold, the larger the patches. '
                              'If set to "auto", will use Otsu threshold instead.')
-    parser.add_argument('--smoothgrads',
+    parser.add_argument('--upsample_mode',
+                        type=str,
+                        default='vanilla',
+                        choices=['vanilla', 'smoothgrads'],
+                        help='Upsampling mode. Either vanilla (cubic interpolation) or Smoothgrads.')
+    parser.add_argument('--grads_x_input',
                         action='store_true',
-                        help='Flag that enables use of Smoothgrads for prototype extraction')
-    parser.add_argument('--refined_bbox',
-                        action='store_true',
-                        help='Flag that enables use of refined bounding boxes in Smoothgrads mode')
+                        help='Flag that enables use of gradients x input for refined bounding boxes')
     parser.add_argument('--random_seed',
                         type=int,
                         default=0,
