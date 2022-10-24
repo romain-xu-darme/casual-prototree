@@ -135,7 +135,6 @@ def upsample_similarity_map(
     high_act_patch_indices = find_high_activation_crop(grads, threshold)
     ymin, ymax = high_act_patch_indices[0], high_act_patch_indices[1]
     xmin, xmax = high_act_patch_indices[2], high_act_patch_indices[3]
-#    print(xmin,xmax,ymin,ymax, grads.shape)
     high_act_patch = x_np[ymin:ymax, xmin:xmax, :]
     if grads_x_input:
         # Expand dimension and filter out low activations
