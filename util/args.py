@@ -17,6 +17,7 @@ def add_prototree_init_args(parser: argparse.ArgumentParser) -> argparse.Argumen
     """ Add all options for the initialization of a ProtoTree """
     parser.add_argument('--net',
                         type=str,
+                        metavar='<arch>',
                         default='resnet50_inat',
                         help='Base network used in the tree. Pretrained network on iNaturalist is only available '
                              'for resnet50_inat (default). Others are pretrained on ImageNet. '
@@ -25,22 +26,27 @@ def add_prototree_init_args(parser: argparse.ArgumentParser) -> argparse.Argumen
                              'vgg11, vgg13, vgg16, vgg19, vgg11_bn, vgg13_bn, vgg16_bn or vgg19_bn')
     parser.add_argument('--depth',
                         type=int,
+                        metavar='<num>',
                         default=9,
                         help='The tree is initialized as a complete tree of this depth')
     parser.add_argument('--W1',
                         type=int,
+                        metavar='<width>',
                         default=1,
                         help='Width of the prototype. Correct behaviour of the model with W1 != 1 is not guaranteed')
     parser.add_argument('--H1',
                         type=int,
+                        metavar='<height>',
                         default=1,
                         help='Height of the prototype. Correct behaviour of the model with H1 != 1 is not guaranteed')
     parser.add_argument('--num_features',
                         type=int,
+                        metavar='<num>',
                         default=256,
                         help='Depth of the prototype and therefore also depth of convolutional output')
     parser.add_argument('--init_mode',
                         type=str,
+                        metavar='<mode>',
                         default=None,
                         help='Either None, "pretrained", or path to a state dict file. \n'
                              '- None: the backbone network is initialized with random weights. \n'
@@ -74,6 +80,7 @@ def add_ensemble_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParse
     """ Add options for building a tree ensemble """
     parser.add_argument('--nr_trees_ensemble',
                         type=int,
+                        metavar='<num>',
                         default=5,
                         help='Number of ProtoTrees to train and (optionally) use in an ensemble. '
                              'Used in main_ensemble.py')
@@ -82,16 +89,19 @@ def add_ensemble_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParse
 
 def add_general_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """ Add general options that are used in most applications """
-    parser.add_argument('--checkpoint',
+    parser.add_argument('--tree_dir',
                         type=str,
+                        metavar='<path>',
                         default='',
                         help='The directory containing a state dict (checkpoint) with a pretrained prototree. ')
     parser.add_argument('--dataset',
                         type=str,
+                        metavar='<name>',
                         default='CUB-200-2011',
                         help='Data set on which the ProtoTree should be trained')
     parser.add_argument('--batch_size',
                         type=int,
+                        metavar='<num>',
                         default=64,
                         help='Batch size when training the model using minibatch gradient descent')
     parser.add_argument('--disable_cuda',
@@ -99,20 +109,24 @@ def add_general_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
                         help='Flag that disables GPU usage if set')
     parser.add_argument('--root_dir',
                         type=str,
+                        metavar='<path>',
                         required=True,
                         help='Root directory where everything will be saved')
     parser.add_argument('--proj_dir',
                         type=str,
+                        metavar='<path>',
                         default='projected',
                         help='Directoy for saving the prototypes, patches and heatmaps (inside root dir)')
     parser.add_argument('--upsample_threshold',
                         type=str,
+                        metavar='<value>',
                         default="0.98",
                         help='Threshold (between 0 and 1) for visualizing the nearest patch of an '
                              'image after upsampling. The higher this threshold, the larger the patches. '
                              'If set to "auto", will use Otsu threshold instead.')
     parser.add_argument('--upsample_mode',
                         type=str,
+                        metavar='<mode>',
                         default='vanilla',
                         choices=['vanilla', 'smoothgrads'],
                         help='Upsampling mode. Either vanilla (cubic interpolation) or Smoothgrads.')
@@ -121,6 +135,7 @@ def add_general_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
                         help='Flag that enables use of gradients x input for refined bounding boxes')
     parser.add_argument('--random_seed',
                         type=int,
+                        metavar='<seed>',
                         default=0,
                         help='Random seed (for reproducibility)')
     return parser
@@ -130,58 +145,71 @@ def add_training_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParse
     """ Add all options for the training of a ProtoTree """
     parser.add_argument('--epochs',
                         type=int,
+                        metavar='<num>',
                         default=100,
                         help='The number of epochs the tree should be trained')
     parser.add_argument('--optimizer',
                         type=str,
+                        metavar='<name>',
                         default='AdamW',
                         help='The optimizer that should be used when training the tree')
     parser.add_argument('--lr',
                         type=float,
+                        metavar='<rate>',
                         default=0.001,
                         help='The optimizer learning rate for training the prototypes')
     parser.add_argument('--lr_block',
                         type=float,
+                        metavar='<rate>',
                         default=0.001,
                         help='The optimizer learning rate for training the 1x1 conv layer and last conv layer '
                              'of the underlying neural network (applicable to resnet50 and densenet121)')
     parser.add_argument('--lr_net',
                         type=float,
+                        metavar='<rate>',
                         default=1e-5,
                         help='The optimizer learning rate for the underlying neural network')
     parser.add_argument('--lr_pi',
                         type=float,
+                        metavar='<rate>',
                         default=0.001,
                         help='The optimizer learning rate for the leaf distributions '
                              '(only used if disable_derivative_free_leaf_optim flag is set')
     parser.add_argument('--momentum',
                         type=float,
+                        metavar='<value>',
                         default=0.9,
                         help='The optimizer momentum parameter (only applicable to SGD)')
     parser.add_argument('--weight_decay',
                         type=float,
+                        metavar='<value>',
                         default=0.0,
                         help='Weight decay used in the optimizer')
     parser.add_argument('--milestones',
                         type=str,
+                        metavar='<value>',
                         default='',
                         help='The milestones for the MultiStepLR learning rate scheduler')
     parser.add_argument('--gamma',
                         type=float,
+                        metavar='<value>',
                         default=0.5,
                         help='The gamma for the MultiStepLR learning rate scheduler. Needs to be 0<=gamma<=1')
     parser.add_argument('--freeze_epochs',
                         type=int,
+                        metavar='<num>',
                         default=2,
                         help='Number of epochs where pretrained features_net will be frozen'
                         )
     parser.add_argument('--pruning_threshold_leaves',
                         type=float,
+                        metavar='<threshold>',
                         default=0.01,
                         help='An internal node will be pruned when the maximum class probability in the distributions '
                              'of all leaves below this node are lower than this threshold.')
     parser.add_argument('--projection_mode',
                         type=str,
+                        metavar='<mode>',
                         default='cropped',
                         choices=['raw', 'cropped', 'corners'],
                         help='Specify the preprocessing on the training set before projecting prototypes.'

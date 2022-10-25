@@ -31,7 +31,7 @@ def run_tree(args: argparse.Namespace = None):
     resume = False
     if (os.path.exists(args.root_dir) and os.path.exists(args.root_dir+'/metadata')
             and load_args(args.root_dir+'/metadata') == args and os.path.exists(args.root_dir+'/checkpoints/latest')) \
-            or args.checkpoint != '':
+            or args.tree_dir != '':
         # Directory already exists and contains the same arguments => resume computation
         # Alternatively, checkpoint can be explicitely specified
         resume = True
@@ -109,7 +109,7 @@ def run_tree(args: argparse.Namespace = None):
         epoch = 1
     else:
         # Either latest checkpoint or the one pointed by args
-        directory_path = log.checkpoint_dir+'/latest' if not args.checkpoint else args.checkpoint
+        directory_path = log.checkpoint_dir+'/latest' if not args.tree_dir else args.tree_dir
         print('Resuming computation from ' + directory_path)
         tree, (optimizer, params_to_freeze, params_to_train), scheduler, stats = \
             load_checkpoint(directory_path)

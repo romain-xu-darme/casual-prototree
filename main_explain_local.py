@@ -12,21 +12,24 @@ import os
 def get_local_expl_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser('Explain a prediction')
     add_general_args(parser)
-    parser.add_argument('--prototree',
-                        type=str,
-                        help='Directory to trained ProtoTree')
     parser.add_argument('--sample_dir',
                         type=str,
+                        metavar='<path>',
                         help='Directory to image to be explained, or to a folder containing multiple test images')
     parser.add_argument('--results_dir',
                         type=str,
+                        metavar='<path>',
                         default='local_explanations',
                         help='Directory where local explanations will be saved')
     parser.add_argument('--image_size',
                         type=int,
+                        metavar='<num>',
                         default=224,
                         help='Resize images to this size')
-    return parser.parse_args()
+    parsed_args = parser.parse_args()
+    if not parsed_args.tree_dir:
+        parser.error('Missing path to Prototree (--tree_dir')
+    return parsed_args
 
 
 if __name__ == '__main__':
@@ -41,7 +44,7 @@ if __name__ == '__main__':
     print('Device used: ', str(device))
 
     # Load trained ProtoTree
-    tree = ProtoTree.load(args.prototree).to(device=device)
+    tree = ProtoTree.load(args.tree_dir).to(device=device)
     # Obtain the dataset and dataloaders
     _, _, _, classes, _ = get_dataloaders(
         dataset=args.dataset,
