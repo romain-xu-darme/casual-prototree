@@ -165,8 +165,6 @@ def find_high_activation_crop(mask, threshold):
     lower_y, upper_y, lower_x, upper_x = 0, 0, 0, 0
     for i in range(mask.shape[0]):
         if np.amax(mask[i]) > threshold:
-            if i == 0:
-                print(np.amax(mask[i]), np.amin(mask[i]), threshold)
             lower_y = i
             break
     for i in reversed(range(mask.shape[0])):
