@@ -207,7 +207,7 @@ def run_tree(args: argparse.Namespace = None):
     proj_dir = os.path.join(args.root_dir, args.proj_dir)
     project_info, tree = project_with_class_constraints(tree, projectloader, device, log)
     name = "pruned_and_projected"
-    save_checkpoint(f'{log.checkpoint_dir}/{name}',
+    save_checkpoint(f'{proj_dir}/model/',
                     tree, optimizer, scheduler, epoch, best_train_acc, best_test_acc, leaf_labels, args)
     pruned_projected_tree = deepcopy(tree)
     # Analyse and evaluate pruned tree with projected prototypes
