@@ -62,6 +62,8 @@ if __name__ == '__main__':
     ])
 
     img_list = []
+    if not os.path.exists(os.path.join(args.root_dir, args.results_dir)):
+        os.makedirs(os.path.join(args.root_dir, args.results_dir))
     if os.path.isdir(args.sample_dir):
         class_name = args.sample_dir.strip('/').split('/')[-1]
         if not os.path.exists(os.path.join(os.path.join(args.root_dir, args.results_dir), class_name)):
@@ -74,7 +76,7 @@ if __name__ == '__main__':
             img_list.append((args.sample_dir, args.results_dir))
 
     for img_path, output_path in img_list:
-        print(img_path, output_path)
+        print(img_path)
         gen_pred_vis(
             tree=tree,
             img_tensor=test_transform(Image.open(img_path)).unsqueeze(0).to(device),
