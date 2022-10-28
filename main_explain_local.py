@@ -57,12 +57,10 @@ if __name__ == '__main__':
     ])
 
     img_list = []
-    if not os.path.exists(os.path.join(args.root_dir, args.results_dir)):
-        os.makedirs(os.path.join(args.root_dir, args.results_dir))
+    os.makedirs(os.path.join(args.root_dir, args.results_dir), exist_ok=True)
     if os.path.isdir(args.sample_dir):
         class_name = args.sample_dir.strip('/').split('/')[-1]
-        if not os.path.exists(os.path.join(os.path.join(args.root_dir, args.results_dir), class_name)):
-            os.makedirs(os.path.join(os.path.join(args.root_dir, args.results_dir), class_name))
+        os.makedirs(os.path.join(os.path.join(args.root_dir, args.results_dir), class_name), exist_ok=True)
         for filename in os.listdir(args.sample_dir):
             if filename.endswith(".jpg") or filename.endswith(".png"):
                 img_list.append((os.path.join(args.sample_dir, filename), os.path.join(args.results_dir, class_name)))
