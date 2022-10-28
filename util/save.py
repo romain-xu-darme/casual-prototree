@@ -32,8 +32,7 @@ def save_checkpoint(
     :param leaf_labels: Current leaf labels
     :param args: Command line arguments
     """
-    if not os.path.isdir(directory_path):
-        os.mkdir(directory_path)
+    os.makedirs(directory_path, exist_ok=True)
     tree.eval()
     tree.save(directory_path)
     tree.save_state(directory_path)
@@ -68,17 +67,13 @@ def load_checkpoint(directory_path: str) -> \
 
     # Load all arguments
     args = load_args(directory_path)
-    if not args.disable_cuda and torch.cuda.is_available():
-        device = torch.device('cuda:{}'.format(torch.cuda.current_device()))
-    else:
-        device = torch.device('cpu')
 
     # Load tree, optimizer, scheduler
-    tree = ProtoTree.load(directory_path, map_location=str(device))
+    tree = ProtoTree.load(directory_path, map_location=args.device)
     optimizer, params_to_freeze, params_to_train = get_optimizer(tree, args)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=args.milestones, gamma=args.gamma)
-    optimizer.load_state_dict(torch.load(f'{directory_path}/optimizer_state.pth', map_location=str(device)))
-    scheduler.load_state_dict(torch.load(f'{directory_path}/scheduler_state.pth', map_location=str(device)))
+    optimizer.load_state_dict(torch.load(f'{directory_path}/optimizer_state.pth', map_location=args.device))
+    scheduler.load_state_dict(torch.load(f'{directory_path}/scheduler_state.pth', map_location=args.device))
 
     # Recover current training stats
     with open(directory_path + '/stats.pickle', 'rb') as f:

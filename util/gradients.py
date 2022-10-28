@@ -1,8 +1,7 @@
 import torch
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter
-from typing import List, Optional, Tuple
-from PIL import Image
+from typing import Optional, Tuple
 
 from prototree.prototree import ProtoTree
 
@@ -45,6 +44,36 @@ def normalize_min_max(array: np.array) -> np.array:
     return (array - vmin) / (vmax - vmin + np.finfo(np.float32).eps)
 
 
+def cubic_upsampling(
+        tree: ProtoTree,
+        img_tensor: torch.Tensor,
+        node_id: int,
+        location: Tuple[int, int] = None,
+) -> np.array:
+    """ Perform patch visualization using Cubic interpolation
+
+        :param tree: Prototree
+        :param img_tensor: Input image tensor
+        :param node_id: Node index
+        :param location: Coordinates of feature vector
+        :param device: Target device
+        :return: interpolated similarity map
+    """
+    with torch.no_grad():
+        _, distances_batch, _ = tree.forward_partial(img_tensor)
+        sim_map = torch.exp(-distances_batch[0, node_id]).cpu().numpy()
+    if location is None:
+        # Find location of feature vector with the highest similarity
+        h, w = np.where(sim_map == np.max(sim_map))
+        h, w = h[0], w[0]
+    else:
+        # Location is predefined
+        h, w = location
+    masked_similarity_map = np.zeros(sim_map.shape)
+    masked_similarity_map[h, w] = 1
+    return masked_similarity_map
+
+
 def smoothgrads(
         tree: ProtoTree,
         img_tensor: torch.Tensor,
@@ -56,7 +85,7 @@ def smoothgrads(
         normalize: Optional[bool] = True,
         nsamples: Optional[int] = 10,
         noise: Optional[float] = 0.2,
-) -> Tuple[List[Image.Image], np.array]:
+) -> np.array:
     """ Perform patch visualization using SmoothGrad
 
     :param tree: Prototree

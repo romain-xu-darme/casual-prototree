@@ -8,7 +8,7 @@ from prototree.train import train_epoch, train_epoch_kontschieder
 from prototree.test import eval_accuracy, eval_fidelity
 from prototree.prune import prune
 from prototree.project import project_with_class_constraints
-from prototree.upsample import upsample, upsample_with_smoothgrads
+from prototree.upsample import upsample_prototypes
 
 import torch
 from copy import deepcopy
@@ -31,7 +31,7 @@ def run_tree(args: argparse.Namespace = None):
     resume = False
     if (os.path.exists(args.root_dir) and os.path.exists(args.root_dir+'/metadata')
             and load_args(args.root_dir+'/metadata') == args and os.path.exists(args.root_dir+'/checkpoints/latest')) \
-            or args.checkpoint != '':
+            or args.tree_dir != '':
         # Directory already exists and contains the same arguments => resume computation
         # Alternatively, checkpoint can be explicitely specified
         resume = True
@@ -47,10 +47,7 @@ def run_tree(args: argparse.Namespace = None):
                    'mean_train_crossentropy_loss_during_epoch')
     # Log the run arguments
     save_args(args, log.metadata_dir)
-    if not args.disable_cuda and torch.cuda.is_available():
-        device = 'cuda:{}'.format(torch.cuda.current_device())
-    else:
-        device = 'cpu'
+    device = args.device
 
     # Log which device was actually used
     log.log_message('Device used: ' + device)
@@ -65,7 +62,7 @@ def run_tree(args: argparse.Namespace = None):
         dataset=args.dataset,
         projection_mode=args.projection_mode,
         batch_size=args.batch_size,
-        disable_cuda=args.disable_cuda,
+        device=args.device,
     )
 
     if not resume:
@@ -109,10 +106,11 @@ def run_tree(args: argparse.Namespace = None):
         epoch = 1
     else:
         # Either latest checkpoint or the one pointed by args
-        directory_path = log.checkpoint_dir+'/latest' if not args.checkpoint else args.checkpoint
+        directory_path = log.checkpoint_dir+'/latest' if not args.tree_dir else args.tree_dir
         print('Resuming computation from ' + directory_path)
         tree, (optimizer, params_to_freeze, params_to_train), scheduler, stats = \
             load_checkpoint(directory_path)
+        tree.to(device)
         best_train_acc, best_test_acc, leaf_labels, epoch = stats
         # Go to the next epoch
         epoch += 1
@@ -150,7 +148,7 @@ def run_tree(args: argparse.Namespace = None):
 
             # Evaluate tree
             if args.epochs <= 100 or epoch % 10 == 0 or epoch == args.epochs:
-                eval_info = eval_accuracy(tree, testloader, epoch, device, log)
+                eval_info = eval_accuracy(tree, testloader, f'Epoch {epoch}: ', device, log)
                 original_test_acc = eval_info['test_accuracy']
                 best_test_acc = save_best_test_tree(
                     tree, optimizer, scheduler, epoch,
@@ -169,7 +167,7 @@ def run_tree(args: argparse.Namespace = None):
         epoch = args.epochs
         original_test_acc = None
         if not args.skip_eval_after_training:
-            eval_info = eval_accuracy(tree, testloader, epoch, device, log)
+            eval_info = eval_accuracy(tree, testloader, f'Epoch {epoch}: ', device, log)
             original_test_acc = eval_info['test_accuracy']
             best_test_acc = save_best_test_tree(
                 tree, optimizer, scheduler, epoch,
@@ -189,8 +187,7 @@ def run_tree(args: argparse.Namespace = None):
         PRUNE
     '''
     prune(tree, args.pruning_threshold_leaves, log)
-    name = "pruned"
-    save_checkpoint(f'{log.checkpoint_dir}/{name}',
+    save_checkpoint(f'{log.checkpoint_dir}/pruned',
                     tree, optimizer, scheduler, epoch, best_train_acc, best_test_acc, leaf_labels, args)
     pruned_tree = deepcopy(tree)
     # Analyse and evaluate pruned tree
@@ -198,16 +195,16 @@ def run_tree(args: argparse.Namespace = None):
     analyse_leaf_distributions(tree, log)
     pruned_test_acc = None
     if not args.skip_eval_after_training:
-        eval_info = eval_accuracy(tree, testloader, name, device, log)
+        eval_info = eval_accuracy(tree, testloader, "Pruned tree", device, log)
         pruned_test_acc = eval_info['test_accuracy']
 
     '''
         PROJECT
     '''
     proj_dir = os.path.join(args.root_dir, args.proj_dir)
+    os.makedirs(proj_dir, exist_ok=True)
     project_info, tree = project_with_class_constraints(tree, projectloader, device, log)
-    name = "pruned_and_projected"
-    save_checkpoint(f'{log.checkpoint_dir}/{name}',
+    save_checkpoint(f'{proj_dir}/model/',
                     tree, optimizer, scheduler, epoch, best_train_acc, best_test_acc, leaf_labels, args)
     pruned_projected_tree = deepcopy(tree)
     # Analyse and evaluate pruned tree with projected prototypes
@@ -216,34 +213,25 @@ def run_tree(args: argparse.Namespace = None):
     analyse_leaf_distributions(tree, log)
     pruned_projected_test_acc = eval_info_samplemax = eval_info_greedy = fidelity_info = None
     if not args.skip_eval_after_training:
-        eval_info = eval_accuracy(tree, testloader, name, device, log)
+        eval_info = eval_accuracy(tree, testloader, "Pruned and projected", device, log)
         pruned_projected_test_acc = eval_info['test_accuracy']
-        eval_info_samplemax = eval_accuracy(tree, testloader, name, device, log, 'sample_max')
+        eval_info_samplemax = eval_accuracy(tree, testloader, "Pruned and projected", device, log, 'sample_max')
         get_avg_path_length(tree, eval_info_samplemax, log)
-        eval_info_greedy = eval_accuracy(tree, testloader, name, device, log, 'greedy')
+        eval_info_greedy = eval_accuracy(tree, testloader, "Pruned and projected", device, log, 'greedy')
         get_avg_path_length(tree, eval_info_greedy, log)
         fidelity_info = eval_fidelity(tree, testloader, device, log)
 
     # Upsample prototype for visualization
-    if args.smoothgrads:
-        upsample_with_smoothgrads(
-            tree=tree,
-            project_info=project_info,
-            project_loader=projectloader,
-            img_dir=os.path.join(proj_dir, "upsampling"),
-            log=log,
-            threshold=args.upsample_threshold,
-            refined_bbox=args.refined_bbox,
-        )
-    else:
-        upsample(
-            tree=tree,
-            project_info=project_info,
-            project_loader=projectloader,
-            img_dir=os.path.join(proj_dir, "upsampling"),
-            log=log,
-            threshold=args.upsample_threshold,
-        )
+    upsample_prototypes(
+        tree=tree,
+        project_info=project_info,
+        project_loader=projectloader,
+        output_dir=os.path.join(proj_dir, "upsampling"),
+        threshold=args.upsample_threshold,
+        log=log,
+        mode=args.upsample_mode,
+        grads_x_input=args.grads_x_input,
+    )
     # Save projection file
     torch.save(project_info, os.path.join(proj_dir, 'projection.pth'))
     # visualize tree

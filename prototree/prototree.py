@@ -308,16 +308,14 @@ class ProtoTree(nn.Module):
 
     def save(self, directory_path: str):
         # Make sure the target directory exists
-        if not os.path.isdir(directory_path):
-            os.mkdir(directory_path)
+        os.makedirs(directory_path, exist_ok=True)
         # Save the model to the target directory
         with open(directory_path + '/model.pth', 'wb') as f:
             torch.save(self, f)
 
     def save_state(self, directory_path: str):
         # Make sure the target directory exists
-        if not os.path.isdir(directory_path):
-            os.mkdir(directory_path)
+        os.makedirs(directory_path, exist_ok=True)
         # Save the model to the target directory
         with open(directory_path + '/model_state.pth', 'wb') as f:
             torch.save(self.state_dict(), f)

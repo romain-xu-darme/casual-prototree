@@ -1,112 +1,106 @@
 import os
-import argparse
 from subprocess import check_call
 from PIL import Image
 from prototree.upsample import upsample_similarity_map
-from prototree.upsample import smoothgrads_upsample
 import torch
 from prototree.prototree import ProtoTree
 
 
-def smoothgrads_local(
-        tree: ProtoTree,
-        sample: torch.Tensor,
-        sample_dir: str,
-        folder_name: str,
-        img_name: str,
-        decision_path: list,
-        args: argparse.Namespace):
-    img_dir = os.path.join(os.path.join(os.path.join(args.root_dir, folder_name), img_name),
-                           args.dir_for_saving_images + '_smoothgrads')
-    if not os.path.exists(img_dir):
-        os.makedirs(img_dir)
-
-    img = Image.open(sample_dir)
-
-    for i, node in enumerate(decision_path[:-1]):
-        smoothgrads_upsample(
-            tree=tree, img=img, img_tensor=sample, node=node, location=None, img_dir=img_dir, args=args)
-
-
 def upsample_local(
         tree: ProtoTree,
-        sample: torch.Tensor,
-        sample_dir: str,
-        folder_name: str,
-        img_name: str,
+        img_tensor: torch.Tensor,
+        img_path: str,
+        output_dir: str,
         decision_path: list,
-        args: argparse.Namespace,
+        threshold: str,
+        mode: str = 'vanilla',
+        grads_x_input: bool = False,
 ):
-    img_dir = os.path.join(os.path.join(os.path.join(args.root_dir, folder_name), img_name), args.dir_for_saving_images)
-    if not os.path.exists(img_dir):
-        os.makedirs(img_dir)
-    with torch.no_grad():
-        _, distances_batch, _ = tree.forward_partial(sample)
-        sim_map = torch.exp(-distances_batch[0, :, :, :]).cpu().numpy()
-    img = Image.open(sample_dir)
+    """ Given a test sample, compute and store visual representation of parts similar to prototypes
+
+    :param tree: ProtoTree
+    :param img_tensor: Input image tensor
+    :param img_path: Path to the original image
+    :param output_dir: Directory where to store the visualization
+    :param decision_path: List of main nodes leading to the prediction
+    :param threshold: Upsampling threshold
+    :param mode: Either "vanilla" or "smoothgrads"
+    :param grads_x_input: Use gradients x image to mask out parts of the image with low gradients
+    """
+    os.makedirs(output_dir, exist_ok=True)
+
     for node in decision_path[:-1]:
         upsample_similarity_map(
-            img=img,
-            similarity_map=sim_map[tree._out_map[node]],
-            decision_node_idx=node.index,
-            img_dir=img_dir,
-            args=args,
+            tree=tree,
+            img=Image.open(img_path),
+            img_tensor=img_tensor,
+            node_id=tree._out_map[node],
+            node_name=node.index,
+            output_dir=output_dir,
+            threshold=threshold,
+            location=None,  # Upsample location maximizing similarity
+            mode=mode,
+            grads_x_input=grads_x_input,
         )
 
 
 def gen_pred_vis(
         tree: ProtoTree,
-        sample: torch.Tensor,
-        sample_dir: str,
-        folder_name: str,
-        args: argparse.Namespace,
+        img_tensor: torch.Tensor,
+        img_path: str,
+        proj_dir: str,
+        output_dir: str,
         classes: tuple,
-        pred_kwargs: dict = None,
+        upsample_threshold: str,
+        upsample_mode: str = 'vanilla',
+        grads_x_input: bool = False,
 ):
-    pred_kwargs = pred_kwargs or dict()  # TODO -- assert deterministic routing
+    """ Generate prediction visualization
 
-    # Create dir to store visualization
-    img_name = sample_dir.split('/')[-1].split(".")[-2]
+    :param tree: ProtoTree
+    :param img_tensor: Input image tensor
+    :param img_path: Path to the original image
+    :param proj_dir: Directory containing the prototypes projection and visualizations
+    :param output_dir: Directory where to store the visualization
+    :param classes: Class labels
+    :param upsample_threshold: Upsampling threshold
+    :param upsample_mode: Either "vanilla" or "smoothgrads"
+    :param grads_x_input: Use gradients x image to mask out parts of the image with low gradients
+    """
+    assert upsample_mode in ['vanilla', 'smoothgrads'], f'Unsupported upsample mode {upsample_mode}'
 
-    if not os.path.exists(os.path.join(args.root_dir, folder_name)):
-        os.makedirs(os.path.join(args.root_dir, folder_name))
-    destination_folder = os.path.join(os.path.join(args.root_dir, folder_name), img_name)
-
-    if not os.path.isdir(destination_folder):
-        os.mkdir(destination_folder)
-    if not os.path.isdir(destination_folder + '/node_vis'):
-        os.mkdir(destination_folder + '/node_vis')
-
-    # Get references to where source files are stored
-    name = "pruned_and_projected" if not args.smoothgrads else "pruned_and_projected_sm"
-    upsample_path = os.path.join(os.path.join(args.root_dir, args.dir_for_saving_images), name)
-    nodevis_path = os.path.join(args.root_dir, f'{name}/node_vis')
-    local_upsample_path = os.path.join(destination_folder, args.dir_for_saving_images)
-    if args.smoothgrads:
-        local_upsample_path += "_smoothgrads"
+    # Create directory to store visualization
+    img_name = img_path.split('/')[-1].split(".")[-2]
+    output_dir = os.path.join(output_dir, img_name)
+    os.makedirs(output_dir, exist_ok=True)
+    local_upsample_path = os.path.join(output_dir, 'upsampling')
 
     # Get the model prediction
     with torch.no_grad():
-        pred, pred_info = tree.forward(sample, sampling_strategy='greedy', **pred_kwargs)
+        pred_kwargs = dict()
+        pred, pred_info = tree.forward(img_tensor, sampling_strategy='greedy', **pred_kwargs)
         probs = pred_info['ps']
         label_ix = torch.argmax(pred, dim=1)[0].item()
         assert 'out_leaf_ix' in pred_info.keys()
 
-    # Save input image
-    sample_path = destination_folder + '/node_vis/sample.jpg'
-    # save_image(sample, sample_path)
-    Image.open(sample_dir).save(sample_path)
+    # Copy input image
+    sample_path = os.path.join(output_dir, 'sample.jpg')
+    Image.open(img_path).save(sample_path)
 
-    # Save an image containing the model output
-    output_path = destination_folder + '/node_vis/output.jpg'
     leaf_ix = pred_info['out_leaf_ix'][0]
     leaf = tree.nodes_by_index[leaf_ix]
     decision_path = tree.path_to(leaf)
 
-    if args.smoothgrads:
-        smoothgrads_local(tree, sample, sample_dir, folder_name, img_name, decision_path, args)
-    else:
-        upsample_local(tree, sample, sample_dir, folder_name, img_name, decision_path, args)
+    upsample_local(
+        tree=tree,
+        img_tensor=img_tensor,
+        img_path=img_path,
+        output_dir=local_upsample_path,
+        decision_path=decision_path,
+        threshold=upsample_threshold,
+        mode=upsample_mode,
+        grads_x_input=grads_x_input
+    )
 
     # Prediction graph is visualized using Graphviz
     # Build dot string
@@ -123,7 +117,8 @@ def gen_pred_vis(
         node_ix = node.index
         prob = probs[node_ix].item()
 
-        s += f'node_{i + 1}[image="{upsample_path}/{node_ix}_nearest_patch_of_image.png" group="{"g" + str(i)}"];\n'
+        s += f'node_{i + 1}[image="{proj_dir}/upsampling/{node_ix}_nearest_patch_of_image.png" ' \
+             f'group="{"g" + str(i)}"];\n'
         if prob > 0.5:
             s += f'node_{i + 1}_original[image="{local_upsample_path}/' \
                  f'{node_ix}_bounding_box_nearest_patch_of_image.png" imagescale=width group="{"g" + str(i)}"];\n'
@@ -133,13 +128,12 @@ def gen_pred_vis(
             s += f'node_{i + 1}_original[image="{sample_path}" group="{"g" + str(i)}"];\n'
             label = "Absent      \nSimilarity %.4f                   " % prob
             s += f'node_{i + 1}->node_{i + 1}_original [label="{label}" fontsize=10 fontname=Helvetica];\n'
-        # s += f'node_{i+1}_original->node_{i+1} [label="{label}" fontsize=10 fontname=Helvetica];\n'
 
         s += f'node_{i + 1}->node_{i + 2};\n'
         s += "{rank = same; "f'node_{i + 1}_original' + "; " + f'node_{i + 1}' + "};"
 
     # Create a node for the model output
-    s += f'node_{len(decision_path)}[imagepos="tc" imagescale=height image="{nodevis_path}/' \
+    s += f'node_{len(decision_path)}[imagepos="tc" imagescale=height image="{proj_dir}/node_vis/' \
          f'node_{leaf_ix}_vis.jpg" label="{classes[label_ix]}" labelloc=b fontsize=10 penwidth=0 fontname=Helvetica];\n'
 
     # Connect the input image to the first decision node
@@ -147,10 +141,9 @@ def gen_pred_vis(
 
     s += '}\n'
 
-    pname = "predvis" if not args.smoothgrads else "predvis_sm"
-    with open(os.path.join(destination_folder, f'{pname}.dot'), 'w') as f:
+    with open(os.path.join(output_dir, 'predvis.dot'), 'w') as f:
         f.write(s)
 
-    from_p = os.path.join(destination_folder, f'{pname}.dot')
-    to_pdf = os.path.join(destination_folder, f'{pname}.pdf')
+    from_p = os.path.join(output_dir, 'predvis.dot')
+    to_pdf = os.path.join(output_dir, 'predvis.pdf')
     check_call('dot -Tpdf -Gmargin=0 %s -o %s' % (from_p, to_pdf), shell=True)

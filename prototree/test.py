@@ -1,4 +1,3 @@
-import argparse
 from tqdm import tqdm
 import numpy as np
 import torch
@@ -6,14 +5,13 @@ import torch.optim
 from torch.utils.data import DataLoader
 from prototree.prototree import ProtoTree
 from util.log import Log
-from typing import Any
 
 
 @torch.no_grad()
 def eval_accuracy(
         tree: ProtoTree,
         test_loader: DataLoader,
-        epoch: Any,
+        prefix: str,
         device: str,
         log: Log = None,
         sampling_strategy: str = 'distributed',
@@ -32,7 +30,7 @@ def eval_accuracy(
     tree.eval()
 
     # Show progress on progress bar
-    test_iter = tqdm(enumerate(test_loader), total=len(test_loader), desc=progress_prefix+' %s' % epoch, ncols=0)
+    test_iter = tqdm(enumerate(test_loader), total=len(test_loader), desc=progress_prefix+' %s' % prefix, ncols=0)
 
     # Iterate through the test set
     for i, (xs, ys) in test_iter:
@@ -61,8 +59,8 @@ def eval_accuracy(
 
     info['confusion_matrix'] = cm
     info['test_accuracy'] = acc_from_cm(cm)
-    log.log_message("\nEpoch %s - Test accuracy with %s routing: "
-                    % (epoch, sampling_strategy)+str(info['test_accuracy']))
+    log.log_message("%s - Test accuracy with %s routing: "
+                    % (prefix, sampling_strategy)+str(info['test_accuracy']))
     return info
 
 
