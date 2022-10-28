@@ -113,6 +113,7 @@ def run_tree(args: argparse.Namespace = None):
         print('Resuming computation from ' + directory_path)
         tree, (optimizer, params_to_freeze, params_to_train), scheduler, stats = \
             load_checkpoint(directory_path)
+        tree.to(device)
         best_train_acc, best_test_acc, leaf_labels, epoch = stats
         # Go to the next epoch
         epoch += 1
@@ -204,6 +205,8 @@ def run_tree(args: argparse.Namespace = None):
         PROJECT
     '''
     proj_dir = os.path.join(args.root_dir, args.proj_dir)
+    if not os.path.isdir(proj_dir):
+        os.mkdir(proj_dir)
     project_info, tree = project_with_class_constraints(tree, projectloader, device, log)
     save_checkpoint(f'{proj_dir}/model/',
                     tree, optimizer, scheduler, epoch, best_train_acc, best_test_acc, leaf_labels, args)
