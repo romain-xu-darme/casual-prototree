@@ -28,8 +28,7 @@ def run_ensemble():
     else:
         device = 'cpu'
 
-    if not os.path.isdir(os.path.join(all_args.root_dir, "files")):
-        os.mkdir(os.path.join(all_args.root_dir, "files"))
+    os.makedirs(os.path.join(all_args.root_dir, "files"), exist_ok=True)
 
     # Obtain the data loaders
     trainloader, projectloader, test_loader, classes, num_channels = get_dataloaders(all_args)

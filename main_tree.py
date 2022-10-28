@@ -205,8 +205,7 @@ def run_tree(args: argparse.Namespace = None):
         PROJECT
     '''
     proj_dir = os.path.join(args.root_dir, args.proj_dir)
-    if not os.path.isdir(proj_dir):
-        os.mkdir(proj_dir)
+    os.makedirs(proj_dir, exist_ok=True)
     project_info, tree = project_with_class_constraints(tree, projectloader, device, log)
     save_checkpoint(f'{proj_dir}/model/',
                     tree, optimizer, scheduler, epoch, best_train_acc, best_test_acc, leaf_labels, args)

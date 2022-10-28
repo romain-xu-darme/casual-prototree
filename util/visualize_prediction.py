@@ -27,8 +27,7 @@ def upsample_local(
     :param mode: Either "vanilla" or "smoothgrads"
     :param grads_x_input: Use gradients x image to mask out parts of the image with low gradients
     """
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
 
     for node in decision_path[:-1]:
         upsample_similarity_map(
@@ -73,8 +72,7 @@ def gen_pred_vis(
     # Create directory to store visualization
     img_name = img_path.split('/')[-1].split(".")[-2]
     output_dir = os.path.join(output_dir, img_name)
-    if not os.path.isdir(output_dir):
-        os.mkdir(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
     local_upsample_path = os.path.join(output_dir, 'upsampling')
 
     # Get the model prediction

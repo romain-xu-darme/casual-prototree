@@ -32,8 +32,7 @@ def save_checkpoint(
     :param leaf_labels: Current leaf labels
     :param args: Command line arguments
     """
-    if not os.path.isdir(directory_path):
-        os.mkdir(directory_path)
+    os.makedirs(directory_path, exist_ok=True)
     tree.eval()
     tree.save(directory_path)
     tree.save_state(directory_path)

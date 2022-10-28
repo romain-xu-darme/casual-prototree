@@ -17,12 +17,9 @@ class Log:
         self._mode = mode
 
         # Ensure the directories exist
-        if not os.path.isdir(self.log_dir):
-            os.mkdir(self.log_dir)
-        if not os.path.isdir(self.metadata_dir):
-            os.mkdir(self.metadata_dir)
-        if not os.path.isdir(self.checkpoint_dir):
-            os.mkdir(self.checkpoint_dir)
+        os.makedirs(self.log_dir, exist_ok=True)
+        os.makedirs(self.metadata_dir, exist_ok=True)
+        os.makedirs(self.checkpoint_dir, exist_ok=True)
         open(self.log_dir + '/log.txt', self._mode).close()
 
     @property

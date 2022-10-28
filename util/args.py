@@ -265,8 +265,7 @@ def save_args(args: argparse.Namespace, directory_path: str) -> None:
     :param directory_path: The path to the directory where the arguments should be saved
     """
     # If the specified directory does not exist, create it
-    if not os.path.isdir(directory_path):
-        os.mkdir(directory_path)
+    os.makedirs(directory_path, exist_ok=True)
     # Save the args in a text file
     with open(directory_path + '/args.txt', 'w') as f:
         for arg in vars(args):

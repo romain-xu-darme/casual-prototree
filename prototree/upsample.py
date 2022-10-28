@@ -36,8 +36,7 @@ def upsample_prototypes(
     """
     assert mode in ['vanilla', 'smoothgrads'], f'Unsupported upsampling mode {mode}'
 
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
     log.log_message("\nUpsampling prototypes for visualization...")
     imgs = project_loader.dataset.imgs
     for node, j in tree._out_map.items():
@@ -91,8 +90,7 @@ def upsample_similarity_map(
     :param grads_x_input: Use gradients x image to mask out parts of the image with low gradients
     """
     assert mode in ['vanilla', 'smoothgrads'], f'Unsupported upsampling mode {mode}'
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
 
     x_np = np.asarray(img)
     x_np = np.float32(x_np) / 255

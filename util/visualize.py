@@ -24,10 +24,8 @@ def gen_vis(
     """
     upsample_dir = os.path.join(output_dir, "upsampling")
     node_dir = os.path.join(output_dir, "node_vis")
-    if not os.path.isdir(upsample_dir):
-        os.mkdir(upsample_dir)
-    if not os.path.isdir(node_dir):
-        os.mkdir(node_dir)
+    os.makedirs(upsample_dir, exist_ok=True)
+    os.makedirs(node_dir, exist_ok=True)
 
     with torch.no_grad():
         s = 'digraph T {margin=0;ranksep=".03";nodesep="0.05";splines="false";\n'
