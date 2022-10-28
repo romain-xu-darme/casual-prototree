@@ -150,7 +150,7 @@ def run_tree(args: argparse.Namespace = None):
 
             # Evaluate tree
             if args.epochs <= 100 or epoch % 10 == 0 or epoch == args.epochs:
-                eval_info = eval_accuracy(tree, testloader, epoch, device, log)
+                eval_info = eval_accuracy(tree, testloader, f'Epoch {epoch}: ', device, log)
                 original_test_acc = eval_info['test_accuracy']
                 best_test_acc = save_best_test_tree(
                     tree, optimizer, scheduler, epoch,
@@ -169,7 +169,7 @@ def run_tree(args: argparse.Namespace = None):
         epoch = args.epochs
         original_test_acc = None
         if not args.skip_eval_after_training:
-            eval_info = eval_accuracy(tree, testloader, epoch, device, log)
+            eval_info = eval_accuracy(tree, testloader, f'Epoch {epoch}: ', device, log)
             original_test_acc = eval_info['test_accuracy']
             best_test_acc = save_best_test_tree(
                 tree, optimizer, scheduler, epoch,
@@ -189,8 +189,7 @@ def run_tree(args: argparse.Namespace = None):
         PRUNE
     '''
     prune(tree, args.pruning_threshold_leaves, log)
-    name = "pruned"
-    save_checkpoint(f'{log.checkpoint_dir}/{name}',
+    save_checkpoint(f'{log.checkpoint_dir}/pruned',
                     tree, optimizer, scheduler, epoch, best_train_acc, best_test_acc, leaf_labels, args)
     pruned_tree = deepcopy(tree)
     # Analyse and evaluate pruned tree
@@ -198,7 +197,7 @@ def run_tree(args: argparse.Namespace = None):
     analyse_leaf_distributions(tree, log)
     pruned_test_acc = None
     if not args.skip_eval_after_training:
-        eval_info = eval_accuracy(tree, testloader, name, device, log)
+        eval_info = eval_accuracy(tree, testloader, "Pruned tree", device, log)
         pruned_test_acc = eval_info['test_accuracy']
 
     '''
@@ -206,7 +205,6 @@ def run_tree(args: argparse.Namespace = None):
     '''
     proj_dir = os.path.join(args.root_dir, args.proj_dir)
     project_info, tree = project_with_class_constraints(tree, projectloader, device, log)
-    name = "pruned_and_projected"
     save_checkpoint(f'{proj_dir}/model/',
                     tree, optimizer, scheduler, epoch, best_train_acc, best_test_acc, leaf_labels, args)
     pruned_projected_tree = deepcopy(tree)
@@ -216,11 +214,11 @@ def run_tree(args: argparse.Namespace = None):
     analyse_leaf_distributions(tree, log)
     pruned_projected_test_acc = eval_info_samplemax = eval_info_greedy = fidelity_info = None
     if not args.skip_eval_after_training:
-        eval_info = eval_accuracy(tree, testloader, name, device, log)
+        eval_info = eval_accuracy(tree, testloader, "Pruned and projected", device, log)
         pruned_projected_test_acc = eval_info['test_accuracy']
-        eval_info_samplemax = eval_accuracy(tree, testloader, name, device, log, 'sample_max')
+        eval_info_samplemax = eval_accuracy(tree, testloader, "Pruned and projected", device, log, 'sample_max')
         get_avg_path_length(tree, eval_info_samplemax, log)
-        eval_info_greedy = eval_accuracy(tree, testloader, name, device, log, 'greedy')
+        eval_info_greedy = eval_accuracy(tree, testloader, "Pruned and projected", device, log, 'greedy')
         get_avg_path_length(tree, eval_info_greedy, log)
         fidelity_info = eval_fidelity(tree, testloader, device, log)
 
