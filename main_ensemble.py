@@ -23,11 +23,6 @@ def run_ensemble():
     # Log the run arguments
     save_args(all_args, log.metadata_dir)
 
-    if not all_args.disable_cuda and torch.cuda.is_available():
-        device = 'cuda:{}'.format(torch.cuda.current_device())
-    else:
-        device = 'cpu'
-
     os.makedirs(os.path.join(all_args.root_dir, "files"), exist_ok=True)
 
     # Obtain the data loaders
@@ -76,7 +71,7 @@ def run_ensemble():
             # analyse ensemble with > 1 trees:
             analyse_ensemble(
                 log, all_args,
-                test_loader, device,
+                test_loader, args.device,
                 trained_orig_trees, trained_pruned_trees, trained_pruned_projected_trees,
                 orig_test_accuracies, pruned_test_accuracies, pruned_projected_test_accuracies,
                 project_infos, infos_sample_max, infos_greedy, infos_fidelity

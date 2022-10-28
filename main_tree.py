@@ -47,10 +47,7 @@ def run_tree(args: argparse.Namespace = None):
                    'mean_train_crossentropy_loss_during_epoch')
     # Log the run arguments
     save_args(args, log.metadata_dir)
-    if not args.disable_cuda and torch.cuda.is_available():
-        device = 'cuda:{}'.format(torch.cuda.current_device())
-    else:
-        device = 'cpu'
+    device = args.device
 
     # Log which device was actually used
     log.log_message('Device used: ' + device)
@@ -65,7 +62,7 @@ def run_tree(args: argparse.Namespace = None):
         dataset=args.dataset,
         projection_mode=args.projection_mode,
         batch_size=args.batch_size,
-        disable_cuda=args.disable_cuda,
+        device=args.device,
     )
 
     if not resume:

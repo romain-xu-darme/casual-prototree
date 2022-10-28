@@ -35,22 +35,17 @@ def get_local_expl_args() -> argparse.Namespace:
 if __name__ == '__main__':
     args = get_local_expl_args()
 
-    if not args.disable_cuda and torch.cuda.is_available():
-        device = torch.device('cuda:{}'.format(torch.cuda.current_device()))
-    else:
-        device = torch.device('cpu')
-
     # Log which device was actually used
-    print('Device used: ', str(device))
+    print('Device used: ', args.device)
 
     # Load trained ProtoTree
-    tree = ProtoTree.load(args.tree_dir).to(device=device)
+    tree = ProtoTree.load(args.tree_dir, map_location=args.device)
     # Obtain the dataset and dataloaders
     _, _, _, classes, _ = get_dataloaders(
         dataset=args.dataset,
         projection_mode=None,
         batch_size=args.batch_size,
-        disable_cuda=args.disable_cuda,
+        device=args.device,
     )
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)

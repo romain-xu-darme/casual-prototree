@@ -104,9 +104,11 @@ def add_general_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
                         metavar='<num>',
                         default=64,
                         help='Batch size when training the model using minibatch gradient descent')
-    parser.add_argument('--disable_cuda',
-                        action='store_true',
-                        help='Flag that disables GPU usage if set')
+    parser.add_argument('--device',
+                        type=str,
+                        metavar='<device>',
+                        default='cuda:0',
+                        help='Target device')
     parser.add_argument('--root_dir',
                         type=str,
                         metavar='<path>',

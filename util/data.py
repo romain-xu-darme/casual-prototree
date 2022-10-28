@@ -54,7 +54,7 @@ def get_data(
     raise Exception(f'Could not load data set "{dataset}"!')
 
 
-def get_dataloaders(dataset: str, projection_mode: str, batch_size: int, disable_cuda: bool):
+def get_dataloaders(dataset: str, projection_mode: str, batch_size: int, device: str):
     """
     Get data loaders
     """
@@ -67,7 +67,7 @@ def get_dataloaders(dataset: str, projection_mode: str, batch_size: int, disable
     )
     c, w, h = shape
     # Determine if GPU should be used
-    cuda = not disable_cuda and torch.cuda.is_available()
+    cuda = device.startswith('cuda')
     trainloader = torch.utils.data.DataLoader(trainset,
                                               batch_size=batch_size,
                                               shuffle=True,
