@@ -1,6 +1,7 @@
 import os
 import argparse
 from util.args import save_args
+from datetime import datetime
 
 
 class Log:
@@ -36,12 +37,20 @@ class Log:
     def metadata_dir(self):
         return self._log_dir + '/metadata'
 
+    @staticmethod
+    def timestamp() -> str:
+        now = datetime.now()
+        return now.strftime("[%d/%m/%Y %H:%M:%S] ")
+
     def log_message(self, msg: str):
         """
         Write a message to the log file
         :param msg: the message string to be written to the log file
         """
         with open(self.log_dir + '/log.txt', 'a') as f:
+            timestamp = self.timestamp()
+            # Move \n if necessary
+            msg = '\n'+timestamp+msg[1:] if msg.startswith('\n') else timestamp+msg
             f.write(msg+"\n")
 
     def create_log(self, log_name: str, key_name: str, *value_names):
