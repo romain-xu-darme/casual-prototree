@@ -72,7 +72,7 @@ if __name__ == '__main__':
         print(img_path)
         gen_pred_vis(
             tree=tree,
-            img_tensor=test_transform(Image.open(img_path)).unsqueeze(0).to(device),
+            img_tensor=test_transform(Image.open(img_path)).unsqueeze(0).to(args.device),
             img_path=img_path,
             proj_dir=os.path.join(args.root_dir, args.proj_dir),
             output_dir=os.path.join(args.root_dir, output_path),
