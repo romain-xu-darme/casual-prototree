@@ -141,6 +141,23 @@ def add_general_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
     return parser
 
 
+def add_finalize_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    parser.add_argument('--pruning_threshold_leaves',
+                        type=float,
+                        metavar='<threshold>',
+                        default=0.01,
+                        help='An internal node will be pruned when the maximum class probability in the distributions '
+                             'of all leaves below this node are lower than this threshold.')
+    parser.add_argument('--projection_mode',
+                        type=str,
+                        metavar='<mode>',
+                        default='cropped',
+                        choices=['raw', 'cropped', 'corners'],
+                        help='Specify the preprocessing on the training set before projecting prototypes.'
+                        )
+    return parser
+
+
 def add_training_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """ Add all options for the training of a ProtoTree """
     parser.add_argument('--epochs',
@@ -201,19 +218,6 @@ def add_training_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParse
                         default=2,
                         help='Number of epochs where pretrained features_net will be frozen'
                         )
-    parser.add_argument('--pruning_threshold_leaves',
-                        type=float,
-                        metavar='<threshold>',
-                        default=0.01,
-                        help='An internal node will be pruned when the maximum class probability in the distributions '
-                             'of all leaves below this node are lower than this threshold.')
-    parser.add_argument('--projection_mode',
-                        type=str,
-                        metavar='<mode>',
-                        default='cropped',
-                        choices=['raw', 'cropped', 'corners'],
-                        help='Specify the preprocessing on the training set before projecting prototypes.'
-                        )
     parser.add_argument('--skip_eval_after_training',
                         action='store_true',
                         help='Skip network evaluation after pruning and projection.'
@@ -222,6 +226,7 @@ def add_training_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParse
                         action='store_true',
                         help='Overwrite output directory when it exists.'
                         )
+    parser = add_finalize_args(parser)
     return parser
 
 
