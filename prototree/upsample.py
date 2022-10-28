@@ -155,6 +155,14 @@ def upsample_similarity_map(
         bbox_width_start=high_act_patch_indices[2],
         bbox_width_end=high_act_patch_indices[3],
         color=(0, 255, 255))
+    imsave_with_bbox(
+        fname=os.path.join(output_dir, '%s_bounding_box_and_heatmap.png' % str(node_name)),
+        img_rgb=overlayed_original_img,
+        bbox_height_start=high_act_patch_indices[0],
+        bbox_height_end=high_act_patch_indices[1],
+        bbox_width_start=high_act_patch_indices[2],
+        bbox_width_end=high_act_patch_indices[3],
+        color=(0, 255, 255))
 
 
 # copied from protopnet
