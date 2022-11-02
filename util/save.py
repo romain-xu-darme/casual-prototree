@@ -98,13 +98,15 @@ def save_tree(
         leaf_labels: dict,
         args: argparse.Namespace,
         log: Log,
+        checkpoint_frequency: int = 10,
 ):
+    assert checkpoint_frequency > 0, f'Invalid checkpoint frequency {checkpoint_frequency}'
     # Save latest model
     save_checkpoint(f'{log.checkpoint_dir}/latest',
                     tree, optimizer, scheduler, epoch, best_train_acc, best_test_acc, leaf_labels, args)
 
     # Save model every 10 epochs
-    if epoch % 10 == 0:
+    if epoch % checkpoint_frequency == 0:
         save_checkpoint(f'{log.checkpoint_dir}/epoch_{epoch}',
                         tree, optimizer, scheduler, epoch, best_train_acc, best_test_acc, leaf_labels, args)
 
