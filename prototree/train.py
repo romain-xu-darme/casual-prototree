@@ -130,6 +130,7 @@ def train_epoch(
         )
         # Compute metrics over this batch
         total_loss += loss.item()
+        total_cce_loss += cce_loss.item()
         total_acc += acc
 
     train_info['loss'] = total_loss/nr_batches
