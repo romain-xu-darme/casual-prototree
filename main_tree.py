@@ -161,7 +161,7 @@ def run_tree(args: argparse.Namespace = None):
                 best_train_acc, best_test_acc, leaf_labels, args, log)
 
             # Evaluate tree
-            if epoch > args.warmup and (args.epochs <= 100 or epoch % 10 == 0 or epoch == args.epochs):
+            if epoch > args.warmup and (args.epochs <= 150 or epoch % 10 == 0 or epoch == args.epochs):
                 eval_info = eval_accuracy(tree, testloader, f'Epoch {epoch}: ', device, log)
                 original_test_acc = eval_info['test_accuracy']
                 best_test_acc = save_best_test_tree(
