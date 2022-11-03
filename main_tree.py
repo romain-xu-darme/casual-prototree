@@ -108,7 +108,7 @@ def run_tree(args: argparse.Namespace = None):
         epoch += 1
 
     # Create a csv log for storing the test accuracy, mean train accuracy and mean loss for each epoch
-    logged_values = ('test_acc', 'mean_train_acc', 'mean_train_crossentropy_loss_during_epoch')
+    logged_values = ('test_acc', 'mean_total_loss', 'mean_train_acc', 'mean_train_crossentropy_loss_during_epoch')
     if tree.use_realigned_features:
         logged_values += ('realign_loss', 'loc_loss', 'unq_loss')
     log.create_log('log_epoch_overview', 'epoch', *logged_values)
@@ -167,12 +167,12 @@ def run_tree(args: argparse.Namespace = None):
                 best_test_acc = save_best_test_tree(
                     tree, optimizer, scheduler, epoch,
                     best_train_acc, original_test_acc, best_test_acc, leaf_labels, args, log)
-                stats = (original_test_acc, train_info['train_accuracy'], train_info['loss'])
+                stats = (original_test_acc, train_info['loss'], train_info['train_accuracy'], train_info['cce_loss'])
                 if tree.use_realigned_features:
                     stats += (train_info['realign_loss'], train_info['loc_loss'], train_info['unq_loss'])
                 log.log_values('log_epoch_overview', epoch, *stats)
             else:
-                stats = ("n.a.", train_info['train_accuracy'], train_info['loss'])
+                stats = ("n.a.", train_info['loss'], train_info['train_accuracy'], train_info['cce_loss'])
                 if tree.use_realigned_features:
                     stats += (train_info['realign_loss'], train_info['loc_loss'], train_info['unq_loss'])
                 log.log_values('log_epoch_overview', epoch, *stats)
@@ -190,7 +190,7 @@ def run_tree(args: argparse.Namespace = None):
             best_test_acc = save_best_test_tree(
                 tree, optimizer, scheduler, epoch,
                 best_train_acc, original_test_acc, best_test_acc, leaf_labels, args, log)
-            stats = (original_test_acc, "n.a.", "n.a.")
+            stats = (original_test_acc, "n.a.", "n.a.", "n.a.")
             if tree.use_realigned_features:
                 stats += ('n.a.', 'n.a.', 'n.a.')
             log.log_values('log_epoch_overview', epoch, *stats)

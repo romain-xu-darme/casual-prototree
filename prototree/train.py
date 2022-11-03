@@ -25,6 +25,7 @@ def train_epoch(
     # Store info about the procedure
     train_info = dict()
     total_loss = 0.
+    total_cce_loss = 0.
     total_acc = 0.
 
     # Init Particul loss function just in case
@@ -69,18 +70,20 @@ def train_epoch(
         # If disable_derivative_free_leaf_optim, leaves are optimized with gradient descent as well.
         # Compute the loss
         if tree._log_probabilities:
-            loss = F.nll_loss(ys_pred, ys)
+            cce_loss = F.nll_loss(ys_pred, ys)
         else:
-            loss = F.nll_loss(torch.log(ys_pred), ys)
+            cce_loss = F.nll_loss(torch.log(ys_pred), ys)
 
         if tree.use_realigned_features:
             # Add Particul loss
             particul_loss, metrics = particul_loss_fn(None, amaps)
             # Weighted sum of classification loss and Particul loss
-            loss = loss*(1-realign_ratio)+realign_ratio*particul_loss
+            loss = cce_loss*(1-realign_ratio)+realign_ratio*particul_loss
             total_realign_loss += metrics[0]
             total_loc_loss += metrics[1]
             total_unq_loss += metrics[2]
+        else:
+            loss = cce_loss
 
         # Compute the gradient
         loss.backward()
@@ -118,7 +121,8 @@ def train_epoch(
         correct = torch.sum(torch.eq(ys_pred_max, ys))
         acc = correct.item() / float(len(xs))
 
-        postfix_str = f'Batch [{i + 1}/{len(train_loader)}], Loss: {loss.item():.3f}, Acc: {acc:.3f}'
+        postfix_str = f'Batch [{i + 1}/{len(train_loader)}], Loss: {loss.item():.3f}, ' \
+                      f'CCE loss: {cce_loss.item()}, Acc: {acc:.3f}'
         if tree.use_realigned_features:
             postfix_str += f' Particul loss: {metrics[0]:.3f} (Loc: {metrics[1]:.3f}, Unq: {metrics[2]:.3f})'
         train_iter.set_postfix_str(
@@ -129,6 +133,7 @@ def train_epoch(
         total_acc += acc
 
     train_info['loss'] = total_loss/nr_batches
+    train_info['cce_loss'] = total_cce_loss/nr_batches
     train_info['train_accuracy'] = total_acc/nr_batches
     if tree.use_realigned_features:
         train_info['realign_loss'] = total_realign_loss/nr_batches
@@ -153,6 +158,7 @@ def train_epoch_kontschieder(
     # Store info about the procedure
     train_info = dict()
     total_loss = 0.
+    total_cce_loss = 0.
     total_acc = 0.
     nr_batches = float(len(train_loader))
 
@@ -202,18 +208,20 @@ def train_epoch_kontschieder(
 
         # Compute the loss
         if tree._log_probabilities:
-            loss = F.nll_loss(ys_pred, ys)
+            cce_loss = F.nll_loss(ys_pred, ys)
         else:
-            loss = F.nll_loss(torch.log(ys_pred), ys)
+            cce_loss = F.nll_loss(torch.log(ys_pred), ys)
 
         if tree.use_realigned_features:
             # Add Particul loss
             particul_loss, metrics = particul_loss_fn(None, amaps)
             # Weighted sum of classification loss and Particul loss
-            loss = loss*(1-realign_ratio)+realign_ratio*particul_loss
+            loss = cce_loss*(1-realign_ratio)+realign_ratio*particul_loss
             total_realign_loss += metrics[0]
             total_loc_loss += metrics[1]
             total_unq_loss += metrics[2]
+        else:
+            loss = cce_loss
 
         # Compute the gradient
         loss.backward()
@@ -226,7 +234,8 @@ def train_epoch_kontschieder(
         correct = torch.sum(torch.eq(ys_pred, ys))
         acc = correct.item() / float(len(xs))
 
-        postfix_str = f'Batch [{i + 1}/{len(train_loader)}], Loss: {loss.item():.3f}, Acc: {acc:.3f}'
+        postfix_str = f'Batch [{i + 1}/{len(train_loader)}], Loss: {loss.item():.3f}, ' \
+                      f'CCE loss: {cce_loss.item()}, Acc: {acc:.3f}'
         if tree.use_realigned_features:
             postfix_str += f' Particul loss: {metrics[0]:.3f} (Loc: {metrics[1]:.3f}, Unq: {metrics[2]:.3f})'
         train_iter.set_postfix_str(
@@ -234,9 +243,11 @@ def train_epoch_kontschieder(
         )
         # Compute metrics over this batch
         total_loss += loss.item()
+        total_cce_loss += cce_loss.item()
         total_acc += acc
 
     train_info['loss'] = total_loss/nr_batches
+    train_info['cce_loss'] = total_cce_loss/nr_batches
     train_info['train_accuracy'] = total_acc/nr_batches
     if tree.use_realigned_features:
         train_info['realign_loss'] = total_realign_loss/nr_batches
