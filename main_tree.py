@@ -135,7 +135,7 @@ def run_tree(args: argparse.Namespace = None):
                     tree._net.set_trainable('detectors', epoch > args.freeze_epochs+args.warmup)
                 # Freeze (part of) network for some epochs if indicated in args
                 freeze(epoch, params_to_freeze, params_to_train, args.freeze_epochs+args.warmup, log)
-                realign_ratio = 0.2 if tree.use_realigned_features else 0.0
+                realign_ratio = args.realign_ratio if tree.use_realigned_features else 0.0
 
             log_learning_rates(optimizer, args, log)
 
