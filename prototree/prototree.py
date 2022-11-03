@@ -4,6 +4,7 @@ import numpy as np
 
 import torch
 import torch.nn as nn
+from particul.realign.model import ParticulRealign
 
 from prototree.branch import Branch
 from prototree.leaf import Leaf
@@ -74,6 +75,11 @@ class ProtoTree(nn.Module):
         self._net = features_net
         self._add_on = add_on_layers
 
+        self._realigned = False
+        if isinstance(self._net, ParticulRealign):
+            print("INFO: Using Particul semantic realignment")
+            self._realigned = True
+
         # Flag that indicates whether probabilities or log probabilities are computed
         self._log_probabilities = log_probabilities
 
@@ -116,6 +122,10 @@ class ProtoTree(nn.Module):
             param.requires_grad = val
 
     @property
+    def use_realigned_features(self) -> bool:
+        return self._realigned
+
+    @property
     def add_on_layers_require_grad(self) -> bool:
         return any([param.requires_grad for param in self._add_on.parameters()])
 
@@ -136,7 +146,11 @@ class ProtoTree(nn.Module):
         '''
 
         # Perform a forward pass with the conv net
-        features = self._net(xs)
+        if self._realigned:
+            # Features have been realigned by Particul (ignore confidence for now)
+            features, _, amaps = self._net(xs)
+        else:
+            features = self._net(xs)
         features = self._add_on(features)
         bs, D, W, H = features.shape
 
@@ -180,8 +194,8 @@ class ProtoTree(nn.Module):
 
         # Generate the output based on the chosen sampling strategy
         if sampling_strategy == ProtoTree.SAMPLING_STRATEGIES[0]:  # Distributed
-            return out, info
-        if sampling_strategy == ProtoTree.SAMPLING_STRATEGIES[1]:  # Sample max
+            dists = out
+        elif sampling_strategy == ProtoTree.SAMPLING_STRATEGIES[1]:  # Sample max
             # Get the batch size
             batch_size = xs.size(0)
             # Get an ordering of all leaves in the tree
@@ -205,8 +219,7 @@ class ProtoTree(nn.Module):
             # Store the indices of the leaves with the highest path probability
             info['out_leaf_ix'] = [leaves[i.item()].index for i in ix]
 
-            return dists, info
-        if sampling_strategy == ProtoTree.SAMPLING_STRATEGIES[2]:  # Greedy
+        elif sampling_strategy == ProtoTree.SAMPLING_STRATEGIES[2]:  # Greedy
             # At every decision node, the child with highest probability will be chosen
             batch_size = xs.size(0)
             # Set the threshold for when either child is more likely
@@ -233,14 +246,18 @@ class ProtoTree(nn.Module):
 
             # Store info
             info['out_leaf_ix'] = [path[-1].index for path in routing]
+        else:
+            raise Exception('Sampling strategy not recognized!')
 
-            return dists, info
-        raise Exception('Sampling strategy not recognized!')
+        if self._realigned and self.training:
+            # Also return Particul activation maps during training
+            return dists, info, amaps
+        return dists, info
 
     def forward_partial(self, xs: torch.Tensor) -> tuple:
 
         # Perform a forward pass with the conv net
-        features = self._net(xs)
+        features = self._net(xs)[0] if self._realigned else self._net(xs)
         features = self._add_on(features)
 
         # Use the features to compute the distances from the prototypes
@@ -253,6 +270,7 @@ class ProtoTree(nn.Module):
 
         :param mode: Train (true) or eval (false)
         """
+        self.training = mode
         self._net.train(mode)
         self._add_on.train(mode)
         self.prototype_layer.train(mode)
