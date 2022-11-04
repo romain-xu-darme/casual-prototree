@@ -48,7 +48,6 @@ def upsample_prototypes(
 
             prototype_location = prototype_info['patch_ix']
             W, H = prototype_info['W'], prototype_info['H']
-            assert W == H
 
             upsample_similarity_map(
                 tree=tree,
@@ -58,7 +57,7 @@ def upsample_prototypes(
                 node_name=node_name,
                 output_dir=output_dir,
                 threshold=threshold,
-                location=(prototype_location // W, prototype_location % W),
+                location=(prototype_location // H, prototype_location % H),
                 mode=mode,
                 grads_x_input=grads_x_input,
             )
