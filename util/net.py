@@ -67,7 +67,7 @@ def get_network(net: str, init_mode: str, num_features: int) -> Tuple[nn.Module,
         npatterns = int(net.split('_')[1])
         backbone = '_'.join(net.split('_')[2:])
         features = ParticulRealign(
-            detector=Particul(
+            extractor=Particul(
                 backbone=base_architecture_to_features[backbone](pretrained=True),
                 npatterns=npatterns,
                 activation=None,
@@ -81,7 +81,7 @@ def get_network(net: str, init_mode: str, num_features: int) -> Tuple[nn.Module,
             [i for i in features.modules() if isinstance(i, nn.Conv2d)][-1].out_channels
     elif features_name.startswith('PARTICUL'):
         first_add_on_layer_in_channels = \
-            [i for i in features.detector.backbone.modules() if isinstance(i, nn.Conv2d)][-1].out_channels
+            [i for i in features.extractor.backbone.modules() if isinstance(i, nn.Conv2d)][-1].out_channels
     elif features_name.startswith('DENSE'):
         first_add_on_layer_in_channels = \
             [i for i in features.modules() if isinstance(i, nn.BatchNorm2d)][-1].num_features
