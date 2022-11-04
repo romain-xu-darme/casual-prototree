@@ -122,7 +122,7 @@ def train_epoch(
         acc = correct.item() / float(len(xs))
 
         postfix_str = f'Batch [{i + 1}/{len(train_loader)}], Loss: {loss.item():.3f}, ' \
-                      f'CCE loss: {cce_loss.item()}, Acc: {acc:.3f}'
+                      f'CCE loss: {cce_loss.item():.3f}, Acc: {acc:.3f}'
         if tree.use_realigned_features:
             postfix_str += f' Particul loss: {metrics[0]:.3f} (Loc: {metrics[1]:.3f}, Unq: {metrics[2]:.3f})'
         train_iter.set_postfix_str(
@@ -236,7 +236,7 @@ def train_epoch_kontschieder(
         acc = correct.item() / float(len(xs))
 
         postfix_str = f'Batch [{i + 1}/{len(train_loader)}], Loss: {loss.item():.3f}, ' \
-                      f'CCE loss: {cce_loss.item()}, Acc: {acc:.3f}'
+                      f'CCE loss: {cce_loss.item():.3f}, Acc: {acc:.3f}'
         if tree.use_realigned_features:
             postfix_str += f' Particul loss: {metrics[0]:.3f} (Loc: {metrics[1]:.3f}, Unq: {metrics[2]:.3f})'
         train_iter.set_postfix_str(
