@@ -232,6 +232,18 @@ def add_training_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParse
                         default=0.1,
                         help='Percentage of realignment constraint in the loss function (default: 0.1)'
                         )
+    parser.add_argument('--realign_unq_ratio',
+                        type=float,
+                        metavar='<percentage>',
+                        default=0.2,
+                        help='Percentage of unicity constraint in the realign loss function (default: 0.2)'
+                        )
+    parser.add_argument('--realign_cls_ratio',
+                        type=float,
+                        metavar='<percentage>',
+                        default=0.1,
+                        help='Percentage of clustering constraint in the realign loss function (default: 0.1)'
+                        )
     parser.add_argument('--skip_eval_after_training',
                         action='store_true',
                         help='Skip network evaluation after pruning and projection.'

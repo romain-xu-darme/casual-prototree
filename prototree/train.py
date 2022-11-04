@@ -1,11 +1,11 @@
 from tqdm import tqdm
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim
 import torch.utils.data
 from torch.utils.data import DataLoader
 from prototree.prototree import ProtoTree
-from particul.detector.loss import ParticulLoss
 
 
 def train_epoch(
@@ -16,6 +16,7 @@ def train_epoch(
         disable_derivative_free_leaf_optim: bool,
         device: str,
         realign_ratio: float = 0,
+        realign_loss: nn.Module = None,
         progress_prefix: str = 'Train Epoch',
 ) -> dict:
 
@@ -32,14 +33,7 @@ def train_epoch(
     total_realign_loss = 0
     total_loc_loss = 0
     total_unq_loss = 0
-    particul_loss_fn = ParticulLoss(
-        npatterns=tree._net.npatterns,
-        loc_ksize=1,
-        unq_ratio=1,
-        unq_thres=1.0,
-        cls_ratio=0.0,
-        cls_thres=0.0,
-    ).to(device) if tree.use_realigned_features else None
+    total_cls_loss = 0
 
     nr_batches = float(len(train_loader))
     with torch.no_grad():
@@ -74,14 +68,15 @@ def train_epoch(
         else:
             cce_loss = F.nll_loss(torch.log(ys_pred), ys)
 
-        if tree.use_realigned_features:
+        if realign_loss:
             # Add Particul loss
-            particul_loss, metrics = particul_loss_fn(None, amaps)
+            particul_loss, metrics = realign_loss(None, amaps)
             # Weighted sum of classification loss and Particul loss
             loss = cce_loss*(1-realign_ratio)+realign_ratio*particul_loss
             total_realign_loss += metrics[0]
             total_loc_loss += metrics[1]
             total_unq_loss += metrics[2]
+            total_cls_loss += metrics[3]
         else:
             loss = cce_loss
 
@@ -124,7 +119,8 @@ def train_epoch(
         postfix_str = f'Batch [{i + 1}/{len(train_loader)}], Loss: {loss.item():.3f}, ' \
                       f'CCE loss: {cce_loss.item():.3f}, Acc: {acc:.3f}'
         if tree.use_realigned_features:
-            postfix_str += f' Particul loss: {metrics[0]:.3f} (Loc: {metrics[1]:.3f}, Unq: {metrics[2]:.3f})'
+            postfix_str += f' Particul loss: {metrics[0]:.3f} ' \
+                           f'(Loc: {metrics[1]:.3f}, Unq: {metrics[2]:.3f}, Cls: {metrics[3]:.3f})'
         train_iter.set_postfix_str(
                 postfix_str
         )
@@ -140,6 +136,7 @@ def train_epoch(
         train_info['realign_loss'] = total_realign_loss/nr_batches
         train_info['loc_loss'] = total_loc_loss/nr_batches
         train_info['unq_loss'] = total_unq_loss/nr_batches
+        train_info['cls_loss'] = total_cls_loss/nr_batches
     return train_info
 
 
@@ -151,6 +148,7 @@ def train_epoch_kontschieder(
         disable_derivative_free_leaf_optim: bool,
         device: str,
         realign_ratio: float = 0,
+        realign_loss: nn.Module = None,
         progress_prefix: str = 'Train Epoch',
 ) -> dict:
 
@@ -167,14 +165,7 @@ def train_epoch_kontschieder(
     total_realign_loss = 0
     total_loc_loss = 0
     total_unq_loss = 0
-    particul_loss_fn = ParticulLoss(
-        npatterns=tree._net.npatterns,
-        loc_ksize=1,
-        unq_ratio=1,
-        unq_thres=1.0,
-        cls_ratio=0.0,
-        cls_thres=0.0,
-    ).to(device) if tree.use_realigned_features else None
+    total_cls_loss = 0
 
     # Reset the gradients
     optimizer.zero_grad()
@@ -213,14 +204,15 @@ def train_epoch_kontschieder(
         else:
             cce_loss = F.nll_loss(torch.log(ys_pred), ys)
 
-        if tree.use_realigned_features:
+        if realign_loss:
             # Add Particul loss
-            particul_loss, metrics = particul_loss_fn(None, amaps)
+            particul_loss, metrics = realign_loss(None, amaps)
             # Weighted sum of classification loss and Particul loss
             loss = cce_loss*(1-realign_ratio)+realign_ratio*particul_loss
             total_realign_loss += metrics[0]
             total_loc_loss += metrics[1]
             total_unq_loss += metrics[2]
+            total_cls_loss += metrics[3]
         else:
             loss = cce_loss
 
@@ -238,7 +230,8 @@ def train_epoch_kontschieder(
         postfix_str = f'Batch [{i + 1}/{len(train_loader)}], Loss: {loss.item():.3f}, ' \
                       f'CCE loss: {cce_loss.item():.3f}, Acc: {acc:.3f}'
         if tree.use_realigned_features:
-            postfix_str += f' Particul loss: {metrics[0]:.3f} (Loc: {metrics[1]:.3f}, Unq: {metrics[2]:.3f})'
+            postfix_str += f' Particul loss: {metrics[0]:.3f} ' \
+                           f'(Loc: {metrics[1]:.3f}, Unq: {metrics[2]:.3f}, Cls: {metrics[3]:.3f})'
         train_iter.set_postfix_str(
             postfix_str
         )
@@ -254,6 +247,7 @@ def train_epoch_kontschieder(
         train_info['realign_loss'] = total_realign_loss/nr_batches
         train_info['loc_loss'] = total_loc_loss/nr_batches
         train_info['unq_loss'] = total_unq_loss/nr_batches
+        train_info['cls_loss'] = total_cls_loss/nr_batches
     return train_info
 
 

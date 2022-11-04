@@ -9,6 +9,7 @@ from prototree.test import eval_accuracy, eval_fidelity
 from prototree.prune import prune
 from prototree.project import project_with_class_constraints
 from prototree.upsample import upsample_prototypes
+from particul.detector.loss import ParticulLoss
 
 import torch
 from copy import deepcopy
@@ -110,8 +111,18 @@ def run_tree(args: argparse.Namespace = None):
     # Create a csv log for storing the test accuracy, mean train accuracy and mean loss for each epoch
     logged_values = ('test_acc', 'mean_total_loss', 'mean_train_acc', 'mean_train_crossentropy_loss_during_epoch')
     if tree.use_realigned_features:
-        logged_values += ('realign_loss', 'loc_loss', 'unq_loss')
+        logged_values += ('realign_loss', 'loc_loss', 'unq_loss', 'cls_loss')
     log.create_log('log_epoch_overview', 'epoch', *logged_values)
+
+    # Init Particul loss if necessary
+    realign_loss = ParticulLoss(
+        npatterns=tree._net.npatterns,
+        loc_ksize=1,
+        unq_ratio=args.realign_unq_ratio,
+        unq_thres=1.0,
+        cls_ratio=args.realign_cls_ratio,
+        cls_thres=0.0,
+    ).to(device) if tree.use_realigned_features else None
 
     if epoch < args.epochs+1:
         '''
@@ -143,11 +154,11 @@ def run_tree(args: argparse.Namespace = None):
             if tree._kontschieder_train:
                 train_info = train_epoch_kontschieder(
                     tree, trainloader, optimizer, epoch,
-                    args.disable_derivative_free_leaf_optim, device, realign_ratio)
+                    args.disable_derivative_free_leaf_optim, device, realign_ratio, realign_loss)
             else:
                 train_info = train_epoch(
                     tree, trainloader, optimizer, epoch,
-                    args.disable_derivative_free_leaf_optim, device, realign_ratio)
+                    args.disable_derivative_free_leaf_optim, device, realign_ratio, realign_loss)
             # Update scheduler and leaf labels before saving checkpoints
             scheduler.step()
             leaf_labels = analyse_leafs(tree, epoch, len(classes), leaf_labels, args.pruning_threshold_leaves, log)
@@ -169,12 +180,14 @@ def run_tree(args: argparse.Namespace = None):
                     best_train_acc, original_test_acc, best_test_acc, leaf_labels, args, log)
                 stats = (original_test_acc, train_info['loss'], train_info['train_accuracy'], train_info['cce_loss'])
                 if tree.use_realigned_features:
-                    stats += (train_info['realign_loss'], train_info['loc_loss'], train_info['unq_loss'])
+                    stats += (train_info['realign_loss'],
+                              train_info['loc_loss'], train_info['unq_loss'], train_info['cls_loss'])
                 log.log_values('log_epoch_overview', epoch, *stats)
             else:
                 stats = ("n.a.", train_info['loss'], train_info['train_accuracy'], train_info['cce_loss'])
                 if tree.use_realigned_features:
-                    stats += (train_info['realign_loss'], train_info['loc_loss'], train_info['unq_loss'])
+                    stats += (train_info['realign_loss'],
+                              train_info['loc_loss'], train_info['unq_loss'], train_info['cls_loss'])
                 log.log_values('log_epoch_overview', epoch, *stats)
 
     else:  # tree was loaded and not trained, so evaluate only
