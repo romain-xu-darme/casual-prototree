@@ -1,3 +1,5 @@
+import os.path
+
 import torch
 import torch.nn as nn
 from util.log import Log
@@ -63,7 +65,10 @@ def get_network(net: str, init_mode: str, num_features: int) -> Tuple[nn.Module,
     :returns: Feature extractor and add on layer.
     """
     # Define a conv net for estimating the probabilities at each decision node
-    if net.startswith('particul_'):
+    if os.path.isfile(net):
+        # net is a path to a pretrained network
+        features = torch.load(net)
+    elif net.startswith('particul_'):
         npatterns = int(net.split('_')[1])
         backbone = '_'.join(net.split('_')[2:])
         features = ParticulRealign(
