@@ -69,6 +69,10 @@ def add_prototree_init_args(parser: argparse.ArgumentParser) -> argparse.Argumen
                              'leaf parameters to a probabilitiy distribution, as done by Kontschieder et al. (2015). '
                              'Will iterate over the data 10 times to update the leaves. Computationally more expensive.'
                         )
+    parser.add_argument('--focal_distance',
+                        action='store_true',
+                        help='Flag that enables the use of a focal distance, as described in Rymarczyk et al. (2021)'
+                        )
     parser.add_argument('--log_probabilities',
                         action='store_true',
                         help='Flag that uses log probabilities when set. Useful when getting NaN values.'

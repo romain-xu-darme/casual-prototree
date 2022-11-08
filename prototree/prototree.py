@@ -10,6 +10,7 @@ from prototree.branch import Branch
 from prototree.leaf import Leaf
 from prototree.node import Node
 from util.func import min_pool2d
+from torch.nn.functional import avg_pool2d
 
 from util.l2conv import L2Conv2D
 
@@ -29,6 +30,7 @@ class ProtoTree(nn.Module):
                  kontschieder_normalization: bool = False,
                  kontschieder_train: bool = False,
                  log_probabilities: bool = False,
+                 focal_distance: bool = False,
                  H1: int = 1,
                  W1: int = 1,
                  ) -> None:
@@ -43,6 +45,8 @@ class ProtoTree(nn.Module):
         :param kontschieder_normalization: Use Kontschieder normalization
         :param kontschieder_train: Use Kontschieder training
         :param log_probabilities: Use log of probabilities (improves numerical stability)
+        :param focal_distance: Use focal distance from paper 'Interpretable Image Classification with Differentiable
+            Prototypes Assignment'
         :param H1: Height of each prototype in the latent space
         :param W1: Width of each prototype in the latent space
         """
@@ -82,6 +86,9 @@ class ProtoTree(nn.Module):
 
         # Flag that indicates whether probabilities or log probabilities are computed
         self._log_probabilities = log_probabilities
+
+        # Flag that indicates whether to use focal distance to prototypes (avg-min)
+        self._focal_distance = focal_distance
 
         # Flag that indicates whether a normalization factor should be used instead of softmax.
         self._kontschieder_normalization = kontschieder_normalization
@@ -163,9 +170,17 @@ class ProtoTree(nn.Module):
 
         # Perform global min pooling to see the minimal distance for each prototype to any patch of the input image
         min_distances = min_pool2d(distances, kernel_size=(W, H))
+        if not hasattr(self,'_focal_distance'):
+            self._focal_distance = False
+        if self._focal_distance:
+            # When using focal distance, the objective is to maximize the difference between the min and the average
+            # distance to each prototype, so that only one region at most is similar to a given prototype
+            min_distances -= avg_pool2d(distances, kernel_size=(W, H))
         min_distances = min_distances.view(bs, self.num_prototypes)
 
-        if not self._log_probabilities:
+        if self._focal_distance:
+            similarities = 1-torch.exp(min_distances)
+        elif not self._log_probabilities:
             similarities = torch.exp(-min_distances)
         else:
             # Omit the exp since we require log probabilities

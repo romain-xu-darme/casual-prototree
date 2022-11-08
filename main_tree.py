@@ -77,6 +77,7 @@ def run_tree(args: argparse.Namespace = None):
             kontschieder_normalization=args.kontschieder_normalization,
             kontschieder_train=args.kontschieder_train,
             log_probabilities=args.log_probabilities,
+            focal_distance=args.focal_distance,
             H1=args.H1,
             W1=args.W1,
         )
