@@ -151,7 +151,10 @@ class ProtoTree(nn.Module):
         '''
             PERFORM A FORWARD PASS THROUGH THE FEATURE NET
         '''
-
+        if not hasattr(self, '_realigned'):
+            self._realigned = False
+        if not hasattr(self, '_focal_distance'):
+            self._focal_distance = False
         # Perform a forward pass with the conv net
         if self._realigned:
             # Features have been realigned by Particul (ignore confidence for now)
