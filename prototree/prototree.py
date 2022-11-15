@@ -173,21 +173,19 @@ class ProtoTree(nn.Module):
 
         # Perform global min pooling to see the minimal distance for each prototype to any patch of the input image
         min_distances = min_pool2d(distances, kernel_size=(W, H))
-        if not hasattr(self,'_focal_distance'):
-            self._focal_distance = False
-        if self._focal_distance:
-            # When using focal distance, the objective is to maximize the difference between the min and the average
-            # distance to each prototype, so that only one region at most is similar to a given prototype
-            min_distances -= avg_pool2d(distances, kernel_size=(W, H))
         min_distances = min_distances.view(bs, self.num_prototypes)
-
-        if self._focal_distance:
-            similarities = 1-torch.exp(min_distances)
-        elif not self._log_probabilities:
+        # When using focal distance, the objective is to maximize the difference between the min and the average
+        # distance to each prototype, so that only one region at most is similar to a given prototype
+        avg_distances = avg_pool2d(distances, kernel_size=(W, H)).view(bs, self.num_prototypes)
+        if not self._log_probabilities:
             similarities = torch.exp(-min_distances)
+            if self._focal_distance:
+                similarities = similarities-torch.exp(-avg_distances)
         else:
             # Omit the exp since we require log probabilities
             similarities = -min_distances
+            if self._focal_distance:
+                similarities = similarities+avg_distances
 
         # Add the conv net output to the kwargs dict to be passed to the decision nodes in the tree
         # Split (or chunk) the conv net output tensor of shape (batch_size, num_decision_nodes) into individual tensors
