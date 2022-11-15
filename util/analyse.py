@@ -46,7 +46,9 @@ def average_distance_nearest_image(project_info: dict, tree: ProtoTree, log: Log
         if node in tree.branches:
             distances.append(project_info[j]['distance'])
             if not disable_log:
-                log.log_message("Node %s has nearest distance %s" % (node.index, project_info[j]['distance']))
+                log.log_message("Node %s has nearest distance %s (patch %d in image %d)"
+                                % (node.index, project_info[j]['distance'],
+                                   project_info[j]['patch_ix'], project_info[j]['input_image_ix']))
     if not disable_log:
         log.log_message("Euclidean distances from latent prototypes in tree to nearest image patch: %s"
                         % str(distances))
