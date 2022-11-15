@@ -5,6 +5,7 @@ from util.save import *
 from prototree.prune import prune
 from prototree.project import project_with_class_constraints
 from prototree.upsample import upsample_prototypes
+from util.analyse import average_distance_nearest_image
 
 import torch
 
@@ -47,6 +48,7 @@ def finalize_tree(args: argparse.Namespace = None):
     proj_dir = os.path.join(args.root_dir, args.proj_dir)
     os.makedirs(proj_dir, exist_ok=True)
     project_info, tree = project_with_class_constraints(tree, projectloader, args.device, log)
+    average_distance_nearest_image(project_info, tree, log)
     save_checkpoint(f'{proj_dir}/model/',
                     tree, optimizer, scheduler, epoch, best_train_acc, best_test_acc, leaf_labels, args)
 
