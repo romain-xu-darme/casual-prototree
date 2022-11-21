@@ -1,6 +1,7 @@
 import os
 from subprocess import check_call
 from PIL import Image
+from typing import List
 from prototree.upsample import upsample_similarity_map
 import torch
 from prototree.prototree import ProtoTree
@@ -10,29 +11,35 @@ def upsample_local(
         tree: ProtoTree,
         img_tensor: torch.Tensor,
         img_path: str,
+        seg_path: str,
         output_dir: str,
         decision_path: list,
         threshold: str,
         mode: str = 'vanilla',
         grads_x_input: bool = False,
-):
+) -> List[float]:
     """ Given a test sample, compute and store visual representation of parts similar to prototypes
 
     :param tree: ProtoTree
     :param img_tensor: Input image tensor
     :param img_path: Path to the original image
+    :param seg_path: Path to segmentation of the original image (if any)
     :param output_dir: Directory where to store the visualization
     :param decision_path: List of main nodes leading to the prediction
     :param threshold: Upsampling threshold
     :param mode: Either "vanilla" or "smoothgrads"
     :param grads_x_input: Use gradients x image to mask out parts of the image with low gradients
+    :returns: List of overlap ratios between the prototypes bounding boxes and the object when seg_path is given,
+        None otherwise
     """
     os.makedirs(output_dir, exist_ok=True)
 
+    overlaps = []
     for node in decision_path[:-1]:
-        upsample_similarity_map(
+        overlaps.append(upsample_similarity_map(
             tree=tree,
             img=Image.open(img_path),
+            seg=Image.open(seg_path).convert('RGB') if seg_path else None,
             img_tensor=img_tensor,
             node_id=tree._out_map[node],
             node_name=node.index,
@@ -41,13 +48,15 @@ def upsample_local(
             location=None,  # Upsample location maximizing similarity
             mode=mode,
             grads_x_input=grads_x_input,
-        )
+        ))
+    return overlaps if seg_path else None
 
 
 def gen_pred_vis(
         tree: ProtoTree,
         img_tensor: torch.Tensor,
         img_path: str,
+        seg_path: str,
         proj_dir: str,
         output_dir: str,
         classes: tuple,
@@ -60,6 +69,7 @@ def gen_pred_vis(
     :param tree: ProtoTree
     :param img_tensor: Input image tensor
     :param img_path: Path to the original image
+    :param seg_path: Path to the segmentation of the original image (if any)
     :param proj_dir: Directory containing the prototypes projection and visualizations
     :param output_dir: Directory where to store the visualization
     :param classes: Class labels
@@ -91,10 +101,11 @@ def gen_pred_vis(
     leaf = tree.nodes_by_index[leaf_ix]
     decision_path = tree.path_to(leaf)
 
-    upsample_local(
+    overlaps = upsample_local(
         tree=tree,
         img_tensor=img_tensor,
         img_path=img_path,
+        seg_path=seg_path,
         output_dir=local_upsample_path,
         decision_path=decision_path,
         threshold=upsample_threshold,
@@ -123,6 +134,8 @@ def gen_pred_vis(
             s += f'node_{i + 1}_original[image="{local_upsample_path}/' \
                  f'{node_ix}_bounding_box_nearest_patch_of_image.png" imagescale=width group="{"g" + str(i)}"];\n'
             label = "Present      \nSimilarity %.4f                   " % prob
+            if overlaps is not None:
+                label += "\nOverlap %.2f               " % overlaps[i]
             s += f'node_{i + 1}->node_{i + 1}_original [label="{label}" fontsize=10 fontname=Helvetica];\n'
         else:
             s += f'node_{i + 1}_original[image="{sample_path}" group="{"g" + str(i)}"];\n'

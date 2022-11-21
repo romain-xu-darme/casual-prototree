@@ -66,6 +66,7 @@ def upsample_prototypes(
 def upsample_similarity_map(
         tree: ProtoTree,
         img: Image,
+        seg: Image,
         img_tensor: torch.Tensor,
         node_id: int,
         node_name: int,
@@ -74,11 +75,12 @@ def upsample_similarity_map(
         location: Tuple[int, int] = None,
         mode: str = 'vanilla',
         grads_x_input: bool = False,
-):
+) -> float:
     """ Create a visualization of the most similar patch of an image w.r.t. a given prototype
 
     :param tree: ProtoTree
     :param img: Original image
+    :param seg: Image segmentation (if any)
     :param img_tensor: Image tensor
     :param node_id: Node ID = index of the prototype in the similarity map
     :param node_name: Node name (/= node ID)
@@ -87,10 +89,13 @@ def upsample_similarity_map(
     :param location: If given, these coordinates are used to determine the upsampling target location
     :param mode: Upsampling mode. Either 'vanilla' (cubic interpolation) or 'smoothgrads'
     :param grads_x_input: Use gradients x image to mask out parts of the image with low gradients
+    :returns: ratio of overlap between prototype bounding box and object when segmentation is given, 0 otherwise
     """
     assert mode in ['vanilla', 'smoothgrads'], f'Unsupported upsampling mode {mode}'
     os.makedirs(output_dir, exist_ok=True)
 
+#    img = img if seg is None else ImageChops.multiply(img, seg)
+    seg = seg if seg is None else np.asarray(seg)
     x_np = np.asarray(img)
     x_np = np.float32(x_np) / 255
     if x_np.ndim == 2:  # convert grayscale to RGB
@@ -132,6 +137,12 @@ def upsample_similarity_map(
     high_act_patch_indices = find_high_activation_crop(grads, threshold)
     ymin, ymax = high_act_patch_indices[0], high_act_patch_indices[1]
     xmin, xmax = high_act_patch_indices[2], high_act_patch_indices[3]
+
+    # Measure how much this bounding box intersects with the object
+    overlap = sum([seg[y, x].any() != 0 for y in range(ymin, ymax) for x in range(xmin, xmax)]) if seg is not None \
+        else 0
+    overlap /= ((ymax-ymin)*(xmax-xmin))
+
     high_act_patch = x_np[ymin:ymax, xmin:xmax, :]
     if grads_x_input:
         # Expand dimension and filter out low activations
@@ -162,7 +173,7 @@ def upsample_similarity_map(
         bbox_width_start=high_act_patch_indices[2],
         bbox_width_end=high_act_patch_indices[3],
         color=(0, 255, 255))
-
+    return overlap
 
 # copied from protopnet
 def find_high_activation_crop(mask, threshold):
