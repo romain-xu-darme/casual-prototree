@@ -2,7 +2,7 @@ import os
 import cv2
 import torch
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageChops
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from prototree.prototree import ProtoTree
@@ -94,7 +94,7 @@ def upsample_similarity_map(
     assert mode in ['vanilla', 'smoothgrads'], f'Unsupported upsampling mode {mode}'
     os.makedirs(output_dir, exist_ok=True)
 
-#    img = img if seg is None else ImageChops.multiply(img, seg)
+    img = img if seg is None else ImageChops.multiply(img, seg)
     seg = seg if seg is None else np.asarray(seg)
     x_np = np.asarray(img)
     x_np = np.float32(x_np) / 255
