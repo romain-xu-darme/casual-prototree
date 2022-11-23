@@ -92,8 +92,8 @@ def upsample_similarity_map(
     :returns: ratio of overlap between prototype bounding box and object when segmentation is given, 0 otherwise
     """
     assert mode in ['vanilla', 'smoothgrads'], f'Unsupported upsampling mode {mode}'
-    os.makedirs(output_dir, exist_ok=True)
 
+    # Mask out original image with segmentation if present
     img = img if seg is None else ImageChops.multiply(img, seg)
     seg = seg if seg is None else np.asarray(seg)
     x_np = np.asarray(img)
@@ -119,6 +119,20 @@ def upsample_similarity_map(
             normalize=True
         )
     grads = cv2.resize(grads, dsize=(img_size[1], img_size[0]), interpolation=cv2.INTER_CUBIC)
+    threshold = 1-threshold_otsu(grads) if threshold == "auto" else float(threshold)
+    high_act_patch_indices = find_high_activation_crop(grads, threshold)
+    ymin, ymax = high_act_patch_indices[0], high_act_patch_indices[1]
+    xmin, xmax = high_act_patch_indices[2], high_act_patch_indices[3]
+
+    # Measure how much this bounding box intersects with the object
+    overlap = sum([seg[y, x].any() != 0 for y in range(ymin, ymax) for x in range(xmin, xmax)]) if seg is not None \
+        else 0
+    overlap /= ((ymax-ymin)*(xmax-xmin))
+    if output_dir is None:
+        # Do not save visualizations
+        return overlap
+
+    os.makedirs(output_dir, exist_ok=True)
     heatmap = normalize_min_max(grads)
     heatmap = cv2.applyColorMap(np.uint8(255 * heatmap), cv2.COLORMAP_JET)
     heatmap = np.float32(heatmap) / 255
@@ -132,16 +146,6 @@ def upsample_similarity_map(
         fname=os.path.join(output_dir, '%s_heatmap_original_image.png' % str(node_name)),
         arr=overlayed_original_img,
         vmin=0.0, vmax=1.0)
-
-    threshold = 1-threshold_otsu(grads) if threshold == "auto" else float(threshold)
-    high_act_patch_indices = find_high_activation_crop(grads, threshold)
-    ymin, ymax = high_act_patch_indices[0], high_act_patch_indices[1]
-    xmin, xmax = high_act_patch_indices[2], high_act_patch_indices[3]
-
-    # Measure how much this bounding box intersects with the object
-    overlap = sum([seg[y, x].any() != 0 for y in range(ymin, ymax) for x in range(xmin, xmax)]) if seg is not None \
-        else 0
-    overlap /= ((ymax-ymin)*(xmax-xmin))
 
     high_act_patch = x_np[ymin:ymax, xmin:xmax, :]
     if grads_x_input:
@@ -174,6 +178,7 @@ def upsample_similarity_map(
         bbox_width_end=high_act_patch_indices[3],
         color=(0, 255, 255))
     return overlap
+
 
 # copied from protopnet
 def find_high_activation_crop(mask, threshold):
