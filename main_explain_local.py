@@ -72,12 +72,13 @@ if __name__ == '__main__':
     else:
         if args.sample_dir.endswith(".jpg") or args.sample_dir.endswith(".png"):
             img_list.append((args.sample_dir, args.results_dir))
+    avg_overlap = 0.0
     for img_path, output_path in img_list:
         seg_path = os.path.join(args.seg_dir,
                                 os.path.splitext(os.path.basename(img_path))[0]+'.png') if args.seg_dir else None
         assert seg_path is None or os.path.isfile(seg_path)
         print(img_path)
-        gen_pred_vis(
+        avg_overlap += gen_pred_vis(
             tree=tree,
             img_tensor=test_transform(Image.open(img_path)).unsqueeze(0).to(args.device),
             img_path=img_path,
@@ -89,3 +90,4 @@ if __name__ == '__main__':
             upsample_mode=args.upsample_mode,
             grads_x_input=args.grads_x_input,
         )
+    print(f'Average overlap for {args.sample_dir}: {avg_overlap/len(img_list):.2f}')

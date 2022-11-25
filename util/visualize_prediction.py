@@ -63,7 +63,7 @@ def gen_pred_vis(
         upsample_threshold: str,
         upsample_mode: str = 'vanilla',
         grads_x_input: bool = False,
-):
+) -> float:
     """ Generate prediction visualization
 
     :param tree: ProtoTree
@@ -76,6 +76,7 @@ def gen_pred_vis(
     :param upsample_threshold: Upsampling threshold
     :param upsample_mode: Either "vanilla" or "smoothgrads"
     :param grads_x_input: Use gradients x image to mask out parts of the image with low gradients
+    :returns: Average percentage of overlap between parts positively compared and object segmentation
     """
     assert upsample_mode in ['vanilla', 'smoothgrads'], f'Unsupported upsample mode {upsample_mode}'
 
@@ -112,6 +113,19 @@ def gen_pred_vis(
         mode=upsample_mode,
         grads_x_input=grads_x_input
     )
+
+    avg_overlap = 1.0
+    if overlaps is not None:
+        # Compute stats on percentage of overlap between part visualizations and object segmentation
+        npos = 0  # Number of positive comparisons
+        sum_overlap = 0.0  # Cumulative percentage of overlap
+        for i, node in enumerate(decision_path[:-1]):
+            node_ix = node.index
+            prob = probs[node_ix].item()
+            if prob > 0.5:
+                sum_overlap += overlaps[i]
+                npos += 1
+        avg_overlap = sum_overlap/npos if npos else 1.0
 
     # Prediction graph is visualized using Graphviz
     # Build dot string
@@ -160,3 +174,4 @@ def gen_pred_vis(
     from_p = os.path.join(output_dir, 'predvis.dot')
     to_pdf = os.path.join(output_dir, 'predvis.pdf')
     check_call('dot -Tpdf -Gmargin=0 %s -o %s' % (from_p, to_pdf), shell=True)
+    return avg_overlap
