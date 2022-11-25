@@ -1,76 +1,40 @@
 import torchvision.datasets
 import torchvision.transforms as transforms
 from prototree.prototree import ProtoTree
-from prototree.upsample import upsample_similarity_map
 from util.args import *
+from typing import List, Tuple
 from PIL import Image
 import argparse
 import torch
 from tqdm import tqdm
 import os
-
-
-def upsample_local(
-        tree: ProtoTree,
-        img_tensor: torch.Tensor,
-        img: Image,
-        seg: Image,
-        decision_path: list,
-        threshold: str,
-        mode: str = 'vanilla',
-        grads_x_input: bool = False,
-) -> List[float]:
-    """ Given a test sample, compute and store visual representation of parts similar to prototypes
-
-    :param tree: ProtoTree
-    :param img_tensor: Input image tensor
-    :param img: Original image
-    :param seg: Segmentation of the original image
-    :param decision_path: List of main nodes leading to the prediction
-    :param threshold: Upsampling threshold
-    :param mode: Either "vanilla" or "smoothgrads"
-    :param grads_x_input: Use gradients x image to mask out parts of the image with low gradients
-    :returns: List of overlap ratios between the prototypes bounding boxes and the object
-    """
-    overlaps = []
-    for node in decision_path[:-1]:
-        overlaps.append(upsample_similarity_map(
-            tree=tree,
-            img=img,
-            seg=seg.convert('RGB'),
-            img_tensor=img_tensor,
-            node_id=tree._out_map[node],
-            node_name=node.index,
-            output_dir=None,
-            threshold=threshold,
-            location=None,  # Upsample location maximizing similarity
-            mode=mode,
-            grads_x_input=grads_x_input,
-        ))
-    return overlaps
+import cv2
+import numpy as np
+from prototree.upsample import find_high_activation_crop
+from util.gradients import cubic_upsampling, smoothgrads, normalize_min_max
 
 
 def get_overlap_stats(
         tree: ProtoTree,
         img_tensor: torch.Tensor,
-        img: Image,
         seg: Image,
-        upsample_threshold: str,
+        thresholds: List[float],
         upsample_mode: str = 'vanilla',
-        grads_x_input: bool = False,
 ) -> Tuple[int, List[Tuple[int, float]]]:
     """ Generate prediction visualization
 
     :param tree: ProtoTree
     :param img_tensor: Input image tensor
-    :param img: Original image
     :param seg: Segmentation of the original image
-    :param upsample_threshold: Upsampling threshold
+    :param thresholds: Upsampling threshold
     :param upsample_mode: Either "vanilla" or "smoothgrads"
-    :param grads_x_input: Use gradients x image to mask out parts of the image with low gradients
-    :returns: Prediction, average percentage of overlap between parts positively compared and object segmentation
+    :returns: Prediction, overlap statistics for each node used in positive reasoning
     """
     assert upsample_mode in ['vanilla', 'smoothgrads'], f'Unsupported upsample mode {upsample_mode}'
+
+    # Preprocess segmentation
+    seg = np.asarray(seg.convert('RGB'))
+    img_size = seg.shape[:2]
 
     # Get the model prediction
     with torch.no_grad():
@@ -83,27 +47,47 @@ def get_overlap_stats(
     leaf_ix = pred_info['out_leaf_ix'][0]
     leaf = tree.nodes_by_index[leaf_ix]
     decision_path = tree.path_to(leaf)
+    stats = []
+    for i, node in enumerate(decision_path[:-1]):
+        node_ix = node.index
+        prob = probs[node_ix].item()
+        if prob <= 0.5:
+            continue  # Ignore negative comparisons
 
-    overlaps = upsample_local(
-        tree=tree,
-        img_tensor=img_tensor,
-        img=img,
-        seg=seg,
-        decision_path=decision_path,
-        threshold=upsample_threshold,
-        mode=upsample_mode,
-        grads_x_input=grads_x_input
-    )
-
-    overlap_stats = []
-    if overlaps is not None:
         # Compute stats on percentage of overlap between part visualizations and object segmentation
-        for i, node in enumerate(decision_path[:-1]):
-            node_ix = node.index
-            prob = probs[node_ix].item()
-            if prob > 0.5:
-                overlap_stats.append((i, overlaps[i]))
-    return int(label_ix), overlap_stats
+        node_id = tree._out_map[node]
+        if upsample_mode == 'vanilla':
+            grads = cubic_upsampling(
+                tree=tree,
+                img_tensor=img_tensor,
+                node_id=node_id,
+                location=None,
+            )
+        else:  # Smoothgrads
+            grads = smoothgrads(
+                tree=tree,
+                img_tensor=img_tensor,
+                node_id=node_id,
+                location=None,
+                device=img_tensor.device,
+                normalize=False
+            )
+        grads = cv2.resize(grads, dsize=(img_size[1], img_size[0]), interpolation=cv2.INTER_CUBIC)
+        grads = normalize_min_max(grads)
+
+        for threshold in thresholds:
+            # For each threshold value, recompute the bounding box and the area of overlap
+            high_act_patch_indices = find_high_activation_crop(grads, threshold)
+            ymin, ymax = high_act_patch_indices[0], high_act_patch_indices[1]
+            xmin, xmax = high_act_patch_indices[2], high_act_patch_indices[3]
+            # Measure how much this bounding box intersects with the object
+            overlap = sum([seg[y, x].any() != 0 for y in range(ymin, ymax) for x in range(xmin, xmax)])
+            bbox_area = ((ymax - ymin) * (xmax - xmin))
+            overlap /= bbox_area
+            # [ depth in the tree, threshold value, bbox area, percentage of overlap ]
+            stats.append([i, threshold, bbox_area, overlap])
+
+    return int(label_ix), stats
 
 
 def get_local_expl_args() -> argparse.Namespace:
@@ -120,6 +104,11 @@ def get_local_expl_args() -> argparse.Namespace:
                         type=str,
                         metavar='<path>',
                         help='Directory to segmentation of test images')
+    parser.add_argument('--thresholds',
+                        required=True,
+                        type=float, nargs='+',
+                        metavar='<value>',
+                        help='List of thresholding values')
     parser.add_argument('--output',
                         type=str,
                         required=True,
@@ -171,12 +160,10 @@ if __name__ == '__main__':
             pred, stats = get_overlap_stats(
                 tree=tree,
                 img_tensor=transform(img).unsqueeze(0).to(args.device),
-                img=img,
                 seg=seg,
-                upsample_threshold=args.upsample_threshold,
+                thresholds=args.thresholds,
                 upsample_mode=args.upsample_mode,
-                grads_x_input=args.grads_x_input,
             )
-            for depth, stat in stats:
-                f.write(f'{img_name};{label};{pred};{depth};{stat:.2f}\n')
+            for stat in stats:
+                f.write(f'{img_name};{label};{pred};{stat[0]};{stat[1]:.1f};{int(stat[2])};{stat[3]:.2f}\n')
             f.flush()
