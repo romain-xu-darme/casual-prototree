@@ -58,7 +58,7 @@ def get_overlap_stats(
         upsample_threshold: str,
         upsample_mode: str = 'vanilla',
         grads_x_input: bool = False,
-) -> Tuple[int, float]:
+) -> Tuple[int, List[Tuple[int, float]]]:
     """ Generate prediction visualization
 
     :param tree: ProtoTree
@@ -95,20 +95,15 @@ def get_overlap_stats(
         grads_x_input=grads_x_input
     )
 
-    avg_overlap = 1.0
+    overlap_stats = []
     if overlaps is not None:
         # Compute stats on percentage of overlap between part visualizations and object segmentation
-        npos = 0  # Number of positive comparisons
-        sum_overlap = 0.0  # Cumulative percentage of overlap
         for i, node in enumerate(decision_path[:-1]):
             node_ix = node.index
             prob = probs[node_ix].item()
             if prob > 0.5:
-                sum_overlap += overlaps[i]
-                npos += 1
-        avg_overlap = sum_overlap/npos if npos else 1.0
-
-    return int(label_ix), avg_overlap
+                overlap_stats.append((i, overlaps[i]))
+    return int(label_ix), overlap_stats
 
 
 def get_local_expl_args() -> argparse.Namespace:
@@ -162,7 +157,7 @@ if __name__ == '__main__':
     seg_set = torchvision.datasets.ImageFolder(args.seg_dir)
 
     with open(args.output, 'a') as f:
-        f.write('path;label;pred;overlap\n')
+        f.write('path;label;pred;depth;overlap\n')
         stats_iter = tqdm(
             enumerate(zip(img_set, seg_set)),
             total=len(img_set),
@@ -182,4 +177,6 @@ if __name__ == '__main__':
                 upsample_mode=args.upsample_mode,
                 grads_x_input=args.grads_x_input,
             )
-            f.write(f'{img_name};{label};{pred};{stats:.2f}\n')
+            for depth, stat in stats:
+                f.write(f'{img_name};{label};{pred};{depth};{stat:.2f}\n')
+            f.flush()
