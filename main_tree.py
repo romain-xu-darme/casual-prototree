@@ -9,7 +9,6 @@ from prototree.test import eval_accuracy, eval_fidelity
 from prototree.prune import prune
 from prototree.project import project_with_class_constraints
 from prototree.upsample import upsample_prototypes
-from particul.detector.loss import ParticulLoss
 
 import torch
 from copy import deepcopy
@@ -111,19 +110,7 @@ def run_tree(args: argparse.Namespace = None):
 
     # Create a csv log for storing the test accuracy, mean train accuracy and mean loss for each epoch
     logged_values = ('test_acc', 'mean_total_loss', 'mean_train_acc', 'mean_train_crossentropy_loss_during_epoch')
-    if tree.use_realigned_features:
-        logged_values += ('realign_loss', 'loc_loss', 'unq_loss', 'cls_loss')
     log.create_log('log_epoch_overview', 'epoch', *logged_values)
-
-    # Init Particul loss if necessary
-    realign_loss = ParticulLoss(
-        npatterns=tree._net.npatterns,
-        loc_ksize=1,
-        unq_ratio=args.realign_unq_ratio,
-        unq_thres=1.0,
-        cls_ratio=args.realign_cls_ratio,
-        cls_thres=0.0,
-    ).to(device) if tree.use_realigned_features else None
 
     if epoch < args.epochs+1:
         '''
@@ -131,35 +118,19 @@ def run_tree(args: argparse.Namespace = None):
         '''
         for epoch in range(epoch, args.epochs + 1):
             log.log_message("\nEpoch %s" % str(epoch))
-
-            if epoch <= args.warmup:
-                # During warmup, only train semantic realignment
-                assert tree.use_realigned_features, f'Warmup only applicable with Particul semantic realignment'
-                # Disable backbone training
-                tree._net.set_trainable('backbone', False)
-                tree._net.set_trainable('detectors', True)
-                realign_ratio = 1.0
-            else:
-                if tree.use_realigned_features:
-                    # WARNING: In realigned mode, backbone and detectors are entirely frozen during this stage
-                    # (including last convolutional layer of the backbone)
-                    tree._net.set_trainable('backbone', epoch > args.freeze_epochs+args.warmup)
-                    tree._net.set_trainable('detectors', epoch > args.freeze_epochs+args.warmup)
-                # Freeze (part of) network for some epochs if indicated in args
-                freeze(epoch, params_to_freeze, params_to_train, args.freeze_epochs+args.warmup, log)
-                realign_ratio = args.realign_ratio if tree.use_realigned_features else 0.0
-
+            # Freeze (part of) network for some epochs if indicated in args
+            freeze(epoch, params_to_freeze, params_to_train, args.freeze_epochs, log)
             log_learning_rates(optimizer, args, log)
 
             # Train tree
             if tree._kontschieder_train:
                 train_info = train_epoch_kontschieder(
                     tree, trainloader, optimizer, epoch,
-                    args.disable_derivative_free_leaf_optim, device, realign_ratio, realign_loss)
+                    args.disable_derivative_free_leaf_optim, device)
             else:
                 train_info = train_epoch(
                     tree, trainloader, optimizer, epoch,
-                    args.disable_derivative_free_leaf_optim, device, realign_ratio, realign_loss)
+                    args.disable_derivative_free_leaf_optim, device)
             # Update scheduler and leaf labels before saving checkpoints
             scheduler.step()
             leaf_labels = analyse_leafs(tree, epoch, len(classes), leaf_labels, args.pruning_threshold_leaves, log)
@@ -173,22 +144,16 @@ def run_tree(args: argparse.Namespace = None):
                 best_train_acc, best_test_acc, leaf_labels, args, log)
 
             # Evaluate tree
-            if epoch > args.warmup and (args.epochs <= 150 or epoch % 10 == 0 or epoch == args.epochs):
+            if args.epochs <= 150 or epoch % 10 == 0 or epoch == args.epochs:
                 eval_info = eval_accuracy(tree, testloader, f'Epoch {epoch}: ', device, log)
                 original_test_acc = eval_info['test_accuracy']
                 best_test_acc = save_best_test_tree(
                     tree, optimizer, scheduler, epoch,
                     best_train_acc, original_test_acc, best_test_acc, leaf_labels, args, log)
-                stats = (original_test_acc, train_info['loss'], train_info['train_accuracy'], train_info['cce_loss'])
-                if tree.use_realigned_features:
-                    stats += (train_info['realign_loss'],
-                              train_info['loc_loss'], train_info['unq_loss'], train_info['cls_loss'])
+                stats = (original_test_acc, train_info['loss'], train_info['train_accuracy'])
                 log.log_values('log_epoch_overview', epoch, *stats)
             else:
-                stats = ("n.a.", train_info['loss'], train_info['train_accuracy'], train_info['cce_loss'])
-                if tree.use_realigned_features:
-                    stats += (train_info['realign_loss'],
-                              train_info['loc_loss'], train_info['unq_loss'], train_info['cls_loss'])
+                stats = ("n.a.", train_info['loss'], train_info['train_accuracy'])
                 log.log_values('log_epoch_overview', epoch, *stats)
 
     else:  # tree was loaded and not trained, so evaluate only
@@ -205,8 +170,6 @@ def run_tree(args: argparse.Namespace = None):
                 tree, optimizer, scheduler, epoch,
                 best_train_acc, original_test_acc, best_test_acc, leaf_labels, args, log)
             stats = (original_test_acc, "n.a.", "n.a.", "n.a.")
-            if tree.use_realigned_features:
-                stats += ('n.a.', 'n.a.', 'n.a.')
             log.log_values('log_epoch_overview', epoch, *stats)
 
     '''

@@ -224,30 +224,6 @@ def add_training_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParse
                         default=2,
                         help='Number of epochs where pretrained features_net will be frozen'
                         )
-    parser.add_argument('--warmup',
-                        type=int,
-                        metavar='<num>',
-                        default=0,
-                        help='Number of epochs where only the Particul detector will be trained'
-                        )
-    parser.add_argument('--realign_ratio',
-                        type=float,
-                        metavar='<percentage>',
-                        default=0.1,
-                        help='Percentage of realignment constraint in the loss function (default: 0.1)'
-                        )
-    parser.add_argument('--realign_unq_ratio',
-                        type=float,
-                        metavar='<percentage>',
-                        default=0.2,
-                        help='Percentage of unicity constraint in the realign loss function (default: 0.2)'
-                        )
-    parser.add_argument('--realign_cls_ratio',
-                        type=float,
-                        metavar='<percentage>',
-                        default=0.1,
-                        help='Percentage of clustering constraint in the realign loss function (default: 0.1)'
-                        )
     parser.add_argument('--skip_eval_after_training',
                         action='store_true',
                         help='Skip network evaluation after pruning and projection.'
@@ -345,7 +321,7 @@ def get_optimizer(tree, args: argparse.Namespace) -> Tuple[torch.optim.Optimizer
         # to reproduce experimental results
         # freeze resnet50 except last convolutional layer
         for name, param in tree._net.named_parameters():
-            if 'layer4.2' not in name and 'detectors' not in name:
+            if 'layer4.2' not in name:
                 params_to_freeze.append(param)
             else:
                 params_to_train.append(param)
@@ -362,8 +338,6 @@ def get_optimizer(tree, args: argparse.Namespace) -> Tuple[torch.optim.Optimizer
                     "lr": args.lr, "weight_decay_rate": 0, "momentum": 0}]
             if args.disable_derivative_free_leaf_optim:
                 paramlist.append({"params": dist_params, "lr": args.lr_pi, "weight_decay_rate": 0})
-            if tree._realigned:
-                paramlist.append({"params": dist_params, "lr": args.lr_pi, "weight_decay_rate": 0})
         else:
             paramlist = [
                 {"params": params_to_freeze, "lr": args.lr_net, "weight_decay_rate": args.weight_decay},
@@ -376,16 +350,11 @@ def get_optimizer(tree, args: argparse.Namespace) -> Tuple[torch.optim.Optimizer
 
     else:  # other network architectures
         for name, param in tree._net.named_parameters():
-            if 'detectors' not in name:
-                params_to_freeze.append(param)
-            else:
-                params_to_train.append(param)
+            params_to_freeze.append(param)
         paramlist = [
             {"params": params_to_freeze, "lr": args.lr_net, "weight_decay_rate": args.weight_decay},
             {"params": tree._add_on.parameters(), "lr": args.lr_block, "weight_decay_rate": args.weight_decay},
             {"params": tree.prototype_layer.parameters(), "lr": args.lr, "weight_decay_rate": 0}]
-        if params_to_train:
-            paramlist.append({"params": params_to_train, "lr": args.lr_block, "weight_decay_rate": args.weight_decay})
         if args.disable_derivative_free_leaf_optim:
             paramlist.append({"params": dist_params, "lr": args.lr_pi, "weight_decay_rate": 0})
 

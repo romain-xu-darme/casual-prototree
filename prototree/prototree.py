@@ -4,7 +4,6 @@ import numpy as np
 
 import torch
 import torch.nn as nn
-from particul.realign.model import ParticulRealign
 
 from prototree.branch import Branch
 from prototree.leaf import Leaf
@@ -79,11 +78,6 @@ class ProtoTree(nn.Module):
         self._net = features_net
         self._add_on = add_on_layers
 
-        self._realigned = False
-        if isinstance(self._net, ParticulRealign):
-            print("INFO: Using Particul semantic realignment")
-            self._realigned = True
-
         # Flag that indicates whether probabilities or log probabilities are computed
         self._log_probabilities = log_probabilities
 
@@ -129,10 +123,6 @@ class ProtoTree(nn.Module):
             param.requires_grad = val
 
     @property
-    def use_realigned_features(self) -> bool:
-        return self._realigned
-
-    @property
     def add_on_layers_require_grad(self) -> bool:
         return any([param.requires_grad for param in self._add_on.parameters()])
 
@@ -151,16 +141,10 @@ class ProtoTree(nn.Module):
         '''
             PERFORM A FORWARD PASS THROUGH THE FEATURE NET
         '''
-        if not hasattr(self, '_realigned'):
-            self._realigned = False
         if not hasattr(self, '_focal_distance'):
             self._focal_distance = False
         # Perform a forward pass with the conv net
-        if self._realigned:
-            # Features have been realigned by Particul (ignore confidence for now)
-            features, _, amaps = self._net(xs)
-        else:
-            features = self._net(xs)
+        features = self._net(xs)
         features = self._add_on(features)
         bs, D, W, H = features.shape
 
@@ -265,19 +249,14 @@ class ProtoTree(nn.Module):
         else:
             raise Exception('Sampling strategy not recognized!')
 
-        if self._realigned and self.training:
-            # Also return Particul activation maps during training
-            return dists, info, amaps
         return dists, info
 
     def forward_partial(self, xs: torch.Tensor) -> tuple:
-        if not hasattr(self, '_realigned'):
-            self._realigned = False
         if not hasattr(self, '_focal_distance'):
             self._focal_distance = False
 
         # Perform a forward pass with the conv net
-        features = self._net(xs)[0] if self._realigned else self._net(xs)
+        features = self._net(xs)
         features = self._add_on(features)
 
         # Use the features to compute the distances from the prototypes

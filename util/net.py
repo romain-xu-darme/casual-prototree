@@ -3,8 +3,6 @@ import os.path
 import torch
 import torch.nn as nn
 from util.log import Log
-from particul.realign.model import ParticulRealign
-from particul.detector.model import Particul
 from features.resnet_features import (
     resnet18_features,
     resnet34_features,
@@ -68,25 +66,12 @@ def get_network(net: str, init_mode: str, num_features: int) -> Tuple[nn.Module,
     if os.path.isfile(net):
         # net is a path to a pretrained network
         features = torch.load(net)
-    elif net.startswith('particul_'):
-        npatterns = int(net.split('_')[1])
-        backbone = '_'.join(net.split('_')[2:])
-        features = ParticulRealign(
-            extractor=Particul(
-                backbone=base_architecture_to_features[backbone](pretrained=True),
-                npatterns=npatterns,
-                activation=None,
-            )
-        )
     else:
         features = base_architecture_to_features[net](pretrained=(init_mode == "pretrained"))
     features_name = str(features).upper()
     if features_name.startswith('VGG') or features_name.startswith('RES'):
         first_add_on_layer_in_channels = \
             [i for i in features.modules() if isinstance(i, nn.Conv2d)][-1].out_channels
-    elif features_name.startswith('PARTICUL'):
-        first_add_on_layer_in_channels = \
-            [i for i in features.extractor.backbone.modules() if isinstance(i, nn.Conv2d)][-1].out_channels
     elif features_name.startswith('DENSE'):
         first_add_on_layer_in_channels = \
             [i for i in features.modules() if isinstance(i, nn.BatchNorm2d)][-1].num_features
