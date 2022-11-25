@@ -52,6 +52,7 @@ def upsample_prototypes(
             upsample_similarity_map(
                 tree=tree,
                 img=x,
+                seg=None,
                 img_tensor=prototype_info['nearest_input'],
                 node_id=tree._out_map[node],
                 node_name=node_name,

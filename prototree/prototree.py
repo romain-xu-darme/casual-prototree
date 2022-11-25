@@ -271,6 +271,10 @@ class ProtoTree(nn.Module):
         return dists, info
 
     def forward_partial(self, xs: torch.Tensor) -> tuple:
+        if not hasattr(self, '_realigned'):
+            self._realigned = False
+        if not hasattr(self, '_focal_distance'):
+            self._focal_distance = False
 
         # Perform a forward pass with the conv net
         features = self._net(xs)[0] if self._realigned else self._net(xs)
