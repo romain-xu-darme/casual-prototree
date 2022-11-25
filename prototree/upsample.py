@@ -117,9 +117,10 @@ def upsample_similarity_map(
             node_id=node_id,
             location=location,
             device=img_tensor.device,
-            normalize=True
+            normalize=False
         )
     grads = cv2.resize(grads, dsize=(img_size[1], img_size[0]), interpolation=cv2.INTER_CUBIC)
+    grads = normalize_min_max(grads)
     threshold = 1-threshold_otsu(grads) if threshold == "auto" else float(threshold)
     high_act_patch_indices = find_high_activation_crop(grads, threshold)
     ymin, ymax = high_act_patch_indices[0], high_act_patch_indices[1]
@@ -134,8 +135,7 @@ def upsample_similarity_map(
         return overlap
 
     os.makedirs(output_dir, exist_ok=True)
-    heatmap = normalize_min_max(grads)
-    heatmap = cv2.applyColorMap(np.uint8(255 * heatmap), cv2.COLORMAP_JET)
+    heatmap = cv2.applyColorMap(np.uint8(255 * grads), cv2.COLORMAP_JET)
     heatmap = np.float32(heatmap) / 255
     heatmap = heatmap[..., ::-1]
     plt.imsave(
