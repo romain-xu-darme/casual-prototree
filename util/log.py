@@ -1,7 +1,8 @@
 import os
 import argparse
+from util.args import save_args
+from datetime import datetime
 
-from util.args import save_args, load_args
 
 class Log:
 
@@ -9,19 +10,17 @@ class Log:
     Object for managing the log directory
     """
 
-    def __init__(self, log_dir: str):  # Store log in log_dir
+    def __init__(self, log_dir: str, mode: str = 'a'):
 
         self._log_dir = log_dir
         self._logs = dict()
+        self._mode = mode
 
         # Ensure the directories exist
-        if not os.path.isdir(self.log_dir):
-            os.mkdir(self.log_dir)
-        if not os.path.isdir(self.metadata_dir):
-            os.mkdir(self.metadata_dir)
-        if not os.path.isdir(self.checkpoint_dir):
-            os.mkdir(self.checkpoint_dir)
-        open(self.log_dir + '/log.txt', 'w').close() #make log file empty if it already exists
+        os.makedirs(self.log_dir, exist_ok=True)
+        os.makedirs(self.metadata_dir, exist_ok=True)
+        os.makedirs(self.checkpoint_dir, exist_ok=True)
+        open(self.log_dir + '/log.txt', self._mode).close()
 
     @property
     def log_dir(self):
@@ -35,12 +34,20 @@ class Log:
     def metadata_dir(self):
         return self._log_dir + '/metadata'
 
+    @staticmethod
+    def timestamp() -> str:
+        now = datetime.now()
+        return now.strftime("[%d/%m/%Y %H:%M:%S] ")
+
     def log_message(self, msg: str):
         """
         Write a message to the log file
         :param msg: the message string to be written to the log file
         """
         with open(self.log_dir + '/log.txt', 'a') as f:
+            timestamp = self.timestamp()
+            # Move \n if necessary
+            msg = '\n'+timestamp+msg[1:] if msg.startswith('\n') else timestamp+msg
             f.write(msg+"\n")
 
     def create_log(self, log_name: str, key_name: str, *value_names):
@@ -55,7 +62,7 @@ class Log:
         # Add to existing logs
         self._logs[log_name] = (key_name, value_names)
         # Create log file. Create columns
-        with open(self.log_dir + f'/{log_name}.csv', 'w') as f:
+        with open(self.log_dir + f'/{log_name}.csv', self._mode) as f:
             f.write(','.join((key_name,) + value_names) + '\n')
 
     def log_values(self, log_name, key, *values):
@@ -75,4 +82,3 @@ class Log:
 
     def log_args(self, args: argparse.Namespace):
         save_args(args, self._log_dir)
-

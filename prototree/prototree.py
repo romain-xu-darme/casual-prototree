@@ -1,6 +1,4 @@
-
 import os
-import argparse
 import pickle
 import numpy as np
 
@@ -11,34 +9,65 @@ from prototree.branch import Branch
 from prototree.leaf import Leaf
 from prototree.node import Node
 from util.func import min_pool2d
+from torch.nn.functional import avg_pool2d
 
 from util.l2conv import L2Conv2D
 
-class ProtoTree(nn.Module):
 
+class ProtoTree(nn.Module):
     ARGUMENTS = ['depth', 'num_features', 'W1', 'H1', 'log_probabilities']
 
     SAMPLING_STRATEGIES = ['distributed', 'sample_max', 'greedy']
 
     def __init__(self,
                  num_classes: int,
-                 feature_net: torch.nn.Module,
-                 args: argparse.Namespace,
+                 depth: int,
+                 num_features: int,
+                 features_net: torch.nn.Module,
                  add_on_layers: nn.Module = nn.Identity(),
-                 ):
+                 derivative_free: bool = True,
+                 kontschieder_normalization: bool = False,
+                 kontschieder_train: bool = False,
+                 log_probabilities: bool = False,
+                 focal_distance: bool = False,
+                 H1: int = 1,
+                 W1: int = 1,
+                 ) -> None:
+        """ Builds a ProtoTree
+
+        :param num_classes: Number of classes in the classification task
+        :param depth: Maximum tree depth
+        :param num_features: Size of the latent space
+        :param features_net: Feature extractor network
+        :param add_on_layers: Additional convolutional layers for dimensionality reduction
+        :param derivative_free: Use the derivative free leaf optimization strategy
+        :param kontschieder_normalization: Use Kontschieder normalization
+        :param kontschieder_train: Use Kontschieder training
+        :param log_probabilities: Use log of probabilities (improves numerical stability)
+        :param focal_distance: Use focal distance from paper 'Interpretable Image Classification with Differentiable
+            Prototypes Assignment'
+        :param H1: Height of each prototype in the latent space
+        :param W1: Width of each prototype in the latent space
+        """
         super().__init__()
-        assert args.depth > 0
+        assert depth > 0
         assert num_classes > 0
 
         self._num_classes = num_classes
 
         # Build the tree
-        self._root = self._init_tree(num_classes, args)
+        self._root = self._init_tree(
+            num_classes=num_classes,
+            depth=depth,
+            derivative_free=derivative_free,
+            kontschieder_normalization=kontschieder_normalization,
+            log_probabilities=log_probabilities,
+        )
 
-        self.num_features = args.num_features
+        self.num_features = num_features
         self.num_prototypes = self.num_branches
-        self.prototype_shape = (args.W1, args.H1, args.num_features)
-        
+        self.prototype_shape = (W1, H1, num_features)
+
         # Keep a dict that stores a reference to each node's parent
         # Key: node -> Value: the node's parent
         # The root of the tree is mapped to None
@@ -46,22 +75,22 @@ class ProtoTree(nn.Module):
         self._set_parents()  # Traverse the tree to build the self._parents dict
 
         # Set the feature network
-        self._net = feature_net
+        self._net = features_net
         self._add_on = add_on_layers
 
         # Flag that indicates whether probabilities or log probabilities are computed
-        self._log_probabilities = args.log_probabilities
+        self._log_probabilities = log_probabilities
 
-        # Flag that indicates whether a normalization factor should be used instead of softmax. 
-        self._kontschieder_normalization = args.kontschieder_normalization
-        self._kontschieder_train = args.kontschieder_train
+        # Flag that indicates whether to use focal distance to prototypes (avg-min)
+        self._focal_distance = focal_distance
+
+        # Flag that indicates whether a normalization factor should be used instead of softmax.
+        self._kontschieder_normalization = kontschieder_normalization
+        self._kontschieder_train = kontschieder_train
         # Map each decision node to an output of the feature net
-        self._out_map = {n: i for i, n in zip(range(2 ** (args.depth) - 1), self.branches)}
+        self._out_map = {n: i for i, n in zip(range(2 ** depth - 1), self.branches)}
 
-        self.prototype_layer = L2Conv2D(self.num_prototypes,
-                                        self.num_features,
-                                        args.W1,
-                                        args.H1)
+        self.prototype_layer = L2Conv2D(self.num_prototypes, self.num_features, W1, H1)
 
     @property
     def root(self) -> Node:
@@ -112,7 +141,8 @@ class ProtoTree(nn.Module):
         '''
             PERFORM A FORWARD PASS THROUGH THE FEATURE NET
         '''
-
+        if not hasattr(self, '_focal_distance'):
+            self._focal_distance = False
         # Perform a forward pass with the conv net
         features = self._net(xs)
         features = self._add_on(features)
@@ -128,12 +158,18 @@ class ProtoTree(nn.Module):
         # Perform global min pooling to see the minimal distance for each prototype to any patch of the input image
         min_distances = min_pool2d(distances, kernel_size=(W, H))
         min_distances = min_distances.view(bs, self.num_prototypes)
-
+        # When using focal distance, the objective is to maximize the difference between the min and the average
+        # distance to each prototype, so that only one region at most is similar to a given prototype
+        avg_distances = avg_pool2d(distances, kernel_size=(W, H)).view(bs, self.num_prototypes)
         if not self._log_probabilities:
             similarities = torch.exp(-min_distances)
+            if self._focal_distance:
+                similarities = similarities-torch.exp(-avg_distances)
         else:
             # Omit the exp since we require log probabilities
             similarities = -min_distances
+            if self._focal_distance:
+                similarities = similarities+avg_distances
 
         # Add the conv net output to the kwargs dict to be passed to the decision nodes in the tree
         # Split (or chunk) the conv net output tensor of shape (batch_size, num_decision_nodes) into individual tensors
@@ -158,8 +194,8 @@ class ProtoTree(nn.Module):
 
         # Generate the output based on the chosen sampling strategy
         if sampling_strategy == ProtoTree.SAMPLING_STRATEGIES[0]:  # Distributed
-            return out, info
-        if sampling_strategy == ProtoTree.SAMPLING_STRATEGIES[1]:  # Sample max
+            dists = out
+        elif sampling_strategy == ProtoTree.SAMPLING_STRATEGIES[1]:  # Sample max
             # Get the batch size
             batch_size = xs.size(0)
             # Get an ordering of all leaves in the tree
@@ -183,8 +219,7 @@ class ProtoTree(nn.Module):
             # Store the indices of the leaves with the highest path probability
             info['out_leaf_ix'] = [leaves[i.item()].index for i in ix]
 
-            return dists, info
-        if sampling_strategy == ProtoTree.SAMPLING_STRATEGIES[2]:  # Greedy
+        elif sampling_strategy == ProtoTree.SAMPLING_STRATEGIES[2]:  # Greedy
             # At every decision node, the child with highest probability will be chosen
             batch_size = xs.size(0)
             # Set the threshold for when either child is more likely
@@ -211,11 +246,14 @@ class ProtoTree(nn.Module):
 
             # Store info
             info['out_leaf_ix'] = [path[-1].index for path in routing]
+        else:
+            raise Exception('Sampling strategy not recognized!')
 
-            return dists, info
-        raise Exception('Sampling strategy not recognized!')
+        return dists, info
 
     def forward_partial(self, xs: torch.Tensor) -> tuple:
+        if not hasattr(self, '_focal_distance'):
+            self._focal_distance = False
 
         # Perform a forward pass with the conv net
         features = self._net(xs)
@@ -225,6 +263,21 @@ class ProtoTree(nn.Module):
         distances = self.prototype_layer(features)  # Shape: (batch_size, num_prototypes, W, H)
 
         return features, distances, dict(self._out_map)
+
+    def train(self, mode: bool = True) -> nn.Module:
+        """ Overwrite train() function to freeze elements if necessary
+
+        :param mode: Train (true) or eval (false)
+        """
+        self.training = mode
+        self._net.train(mode)
+        self._add_on.train(mode)
+        self.prototype_layer.train(mode)
+        # Fix BatchNorm training status
+        for name, layer in self._net.named_modules():
+            if isinstance(layer, torch.nn.BatchNorm2d):
+                layer.train(layer.weight.requires_grad and mode)
+        return self
 
     @property
     def depth(self) -> int:
@@ -272,16 +325,14 @@ class ProtoTree(nn.Module):
 
     def save(self, directory_path: str):
         # Make sure the target directory exists
-        if not os.path.isdir(directory_path):
-            os.mkdir(directory_path)
+        os.makedirs(directory_path, exist_ok=True)
         # Save the model to the target directory
         with open(directory_path + '/model.pth', 'wb') as f:
             torch.save(self, f)
 
     def save_state(self, directory_path: str):
         # Make sure the target directory exists
-        if not os.path.isdir(directory_path):
-            os.mkdir(directory_path)
+        os.makedirs(directory_path, exist_ok=True)
         # Save the model to the target directory
         with open(directory_path + '/model_state.pth', 'wb') as f:
             torch.save(self.state_dict(), f)
@@ -289,28 +340,25 @@ class ProtoTree(nn.Module):
         with open(directory_path + '/tree.pkl', 'wb') as f:
             pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-        
     @staticmethod
-    def load(directory_path: str):
-        return torch.load(directory_path + '/model.pth')      
-       
-    def _init_tree(self,
-                   num_classes,
-                   args: argparse.Namespace) -> Node:
+    def load(directory_path: str, map_location: str = 'cpu'):
+        return torch.load(directory_path + '/model.pth', map_location=map_location)
+
+    @staticmethod
+    def _init_tree(
+                   num_classes: int,
+                   depth: int,
+                   derivative_free: bool,
+                   kontschieder_normalization: bool,
+                   log_probabilities: bool,
+                   ) -> Node:
 
         def _init_tree_recursive(i: int, d: int) -> Node:  # Recursively build the tree
-            if d == args.depth:
-                return Leaf(i,
-                            num_classes,
-                            args
-                            )
+            if d == depth:
+                return Leaf(i, num_classes, derivative_free, kontschieder_normalization, log_probabilities)
             else:
                 left = _init_tree_recursive(i + 1, d + 1)
-                return Branch(i,
-                              left,
-                              _init_tree_recursive(i + left.size + 1, d + 1),
-                              args,
-                              )
+                return Branch(i, left, _init_tree_recursive(i + left.size + 1, d + 1), log_probabilities)
 
         return _init_tree_recursive(0, 0)
 
@@ -340,4 +388,44 @@ class ProtoTree(nn.Module):
             path = [node] + path
         return path
 
+    def __eq__(self, other) -> bool:
+        """ Compare to another ProtoTree
 
+        :param other: Tree to be compared
+        :returns: True if and only if both Prototrees are equivalent
+        """
+        # "Easy" attributes
+        if self._num_classes != other._num_classes \
+                or self.num_features != other.num_features \
+                or self.num_branches != other.num_branches \
+                or self.num_prototypes != other.num_prototypes \
+                or self.prototype_shape != other.prototype_shape \
+                or self._log_probabilities != other._log_probabilities \
+                or self._kontschieder_normalization != other._kontschieder_normalization \
+                or self._kontschieder_train != other._kontschieder_train:
+            return False
+
+        if self._out_map != other._out_map:
+            return False
+
+        def nn_module_compare(m1: nn.Module, m2: nn.Module) -> bool:
+            for key1, key2 in zip(m1.state_dict().keys(), m2.state_dict().keys()):
+                if key1 != key2:
+                    return False
+                if (m1.state_dict()[key1] != m2.state_dict()[key2]).any():
+                    return False
+            return True
+
+        if not nn_module_compare(self._net, other._net):
+            return False
+        if not nn_module_compare(self._add_on, other._add_on):
+            return False
+        if not nn_module_compare(self.prototype_layer, other.prototype_layer):
+            return False
+
+        if not self._root == other._root:
+            return False
+        return True
+
+    def __hash__(self):
+        return hash((self._root, self._net, self._add_on, self.prototype_layer))

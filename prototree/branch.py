@@ -1,12 +1,6 @@
-
 import argparse
-
 import numpy as np
-import math
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
 from prototree.node import Node
 
 
@@ -16,14 +10,14 @@ class Branch(Node):
                  index: int,
                  l: Node,
                  r: Node,
-                 args: argparse.Namespace
+                 log_probabilities: bool,
                  ):
         super().__init__(index)
         self.l = l
         self.r = r
 
         # Flag that indicates whether probabilities or log probabilities are computed
-        self._log_probabilities = args.log_probabilities
+        self._log_probabilities = log_probabilities
 
     def forward(self, xs: torch.Tensor, **kwargs):
 
@@ -38,13 +32,10 @@ class Branch(Node):
         # Therefore, if this attribute is not present this node is assumed to not have a parent.
         # The probability of arriving at this node should thus be set to 1 (as this would be the root in this case)
         # The path probability is tracked for all x in the batch
-        if not self._log_probabilities:
-            pa = node_attr.setdefault((self, 'pa'), torch.ones(batch_size, device=xs.device))
-        else:
-            pa = node_attr.setdefault((self, 'pa'), torch.ones(batch_size, device=xs.device))
+        pa = node_attr.setdefault((self, 'pa'), torch.ones(batch_size, device=xs.device))
 
         # Obtain the probabilities of taking the right subtree
-        ps = self.g(xs, **kwargs)  # shape: (bs,)
+        ps = self.g(**kwargs)  # shape: (bs,)
 
         if not self._log_probabilities:
             # Store decision node probabilities as node attribute
@@ -84,7 +75,7 @@ class Branch(Node):
             logs_stacked = torch.stack((oneminusp + l_dists, ps + r_dists))
             return torch.logsumexp(logs_stacked, dim=0), node_attr  # shape: (bs,)
 
-    def g(self, xs: torch.Tensor, **kwargs):
+    def g(self, **kwargs):
         out_map = kwargs['out_map']  # Obtain the mapping from decision nodes to conv net outputs
         conv_net_output = kwargs['conv_net_output']  # Obtain the conv net outputs
         out = conv_net_output[out_map[self]]  # Obtain the output corresponding to this decision node
@@ -121,3 +112,16 @@ class Branch(Node):
     @property
     def depth(self) -> int:
         return self.l.depth + 1
+
+    def __eq__(self, other) -> bool:
+        """ Recursive comparison between trees """
+        if not other:
+            return False
+        if self._log_probabilities != other._log_probabilities:
+            return False
+        if self.num_branches != other.num_branches:
+            return False
+        return self.l == other.l and self.r == other.r
+
+    def __hash__(self):
+        return hash(self._index)

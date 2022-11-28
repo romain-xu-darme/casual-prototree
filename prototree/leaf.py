@@ -1,10 +1,7 @@
-
 import argparse
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from prototree.node import Node
 
 
@@ -13,22 +10,24 @@ class Leaf(Node):
     def __init__(self,
                  index: int,
                  num_classes: int,
-                 args: argparse.Namespace
+                 derivative_free: bool,
+                 kontschieder_normalization: bool,
+                 log_probabilities: bool,
                  ):
         super().__init__(index)
 
         # Initialize the distribution parameters
-        if args.disable_derivative_free_leaf_optim:
+        if not derivative_free:
             self._dist_params = nn.Parameter(torch.randn(num_classes), requires_grad=True)
-        elif args.kontschieder_normalization:
+        elif kontschieder_normalization:
             self._dist_params = nn.Parameter(torch.ones(num_classes), requires_grad=False)
         else:
             self._dist_params = nn.Parameter(torch.zeros(num_classes), requires_grad=False)
 
         # Flag that indicates whether probabilities or log probabilities are computed
-        self._log_probabilities = args.log_probabilities
+        self._log_probabilities = log_probabilities
 
-        self._kontschieder_normalization = args.kontschieder_normalization
+        self._kontschieder_normalization = kontschieder_normalization
 
     def forward(self, xs: torch.Tensor, **kwargs):
 
@@ -58,7 +57,7 @@ class Leaf(Node):
         # Store leaf distributions as node property
         node_attr[self, 'ds'] = dists
 
-        # Return both the result of the forward pass as well as the node properties
+        # Return both the result of the forward pass and the node properties
         return dists, node_attr
 
     def distribution(self) -> torch.Tensor:
@@ -68,14 +67,15 @@ class Leaf(Node):
             else:
                 # Return numerically stable softmax (see http://www.deeplearningbook.org/contents/numerical.html)
                 return F.softmax(self._dist_params - torch.max(self._dist_params), dim=0)
-        
+
         else:
-            #kontschieder_normalization's version that uses a normalization factor instead of softmax:
+            # kontschieder_normalization's version that uses a normalization factor instead of softmax:
             if self._log_probabilities:
-                return torch.log((self._dist_params / torch.sum(self._dist_params))+1e-10) #add small epsilon for numerical stability
+                # add small epsilon for numerical stability
+                return torch.log((self._dist_params / torch.sum(self._dist_params))+1e-10)
             else:
-                return (self._dist_params / torch.sum(self._dist_params))
-        
+                return self._dist_params / torch.sum(self._dist_params)
+
     @property
     def requires_grad(self) -> bool:
         return self._dist_params.requires_grad
@@ -111,3 +111,16 @@ class Leaf(Node):
     @property
     def depth(self) -> int:
         return 0
+
+    def __eq__(self, other) -> bool:
+        if not other or other.num_branches > 0:
+            return False
+        if self._log_probabilities != other._log_probabilities or \
+                self._kontschieder_normalization != other._kontschieder_normalization:
+            return False
+        if (self._dist_params.data != other._dist_params.data).any():
+            return False
+        return True
+
+    def __hash__(self):
+        return hash(self._index)

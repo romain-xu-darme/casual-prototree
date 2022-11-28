@@ -1,97 +1,93 @@
 from prototree.prototree import ProtoTree
 from util.data import get_dataloaders
 from util.visualize_prediction import gen_pred_vis
+from util.args import *
 import argparse
 import torch
 import torchvision.transforms as transforms
 from PIL import Image
-from shutil import copy
-from copy import deepcopy
 import os
 
-def get_local_expl_args() -> argparse.Namespace:
 
+def get_local_expl_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser('Explain a prediction')
-    parser.add_argument('--prototree',
-                        type=str,
-                        help='Directory to trained ProtoTree')
-    parser.add_argument('--log_dir',
-                        type=str,
-                        default='./runs/run_prototree',
-                        help='The directory in which results should be logged. Should be same log_dir as loaded ProtoTree')
-    parser.add_argument('--dataset',
-                        type=str,
-                        default='CUB-200-2011',
-                        help='Data set on which the ProtoTree was trained')
+    add_general_args(parser)
     parser.add_argument('--sample_dir',
                         type=str,
-                        help='Directory to image to be explained, or to a folder containing multiple test images')
+                        metavar='<path>',
+                        help='Path to image to be explained, or to a folder containing multiple test images')
     parser.add_argument('--results_dir',
                         type=str,
+                        metavar='<path>',
                         default='local_explanations',
                         help='Directory where local explanations will be saved')
-    parser.add_argument('--disable_cuda',
-                        action='store_true',
-                        help='Flag that disables GPU usage if set')
+    parser.add_argument('--seg_dir',
+                        type=str,
+                        metavar='<path>',
+                        help='Directory to segmentation of images to be explained')
     parser.add_argument('--image_size',
                         type=int,
+                        metavar='<num>',
                         default=224,
                         help='Resize images to this size')
-    parser.add_argument('--dir_for_saving_images',
-                        type=str,
-                        default='upsampling_results',
-                        help='Directoy for saving the prototypes, patches and heatmaps')
-    parser.add_argument('--upsample_threshold',
-                        type=float,
-                        default=0.98,
-                        help='Threshold (between 0 and 1) for visualizing the nearest patch of an image after upsampling. The higher this threshold, the larger the patches.')
-    args = parser.parse_args()
-    return args
-
-def explain_local(args):
-    if not args.disable_cuda and torch.cuda.is_available():
-        device = torch.device('cuda:{}'.format(torch.cuda.current_device()))
-    else:
-        device = torch.device('cpu')
-        
-    # Log which device was actually used
-    print('Device used: ',str(device))
-
-    # Load trained ProtoTree
-    tree = ProtoTree.load(args.prototree).to(device=device)
-    # Obtain the dataset and dataloaders
-    args.batch_size=64 #placeholder
-    args.augment = True #placeholder
-    _, _, _, classes, _ = get_dataloaders(args)
-    mean = (0.485, 0.456, 0.406)
-    std = (0.229, 0.224, 0.225)
-    normalize = transforms.Normalize(mean=mean,std=std)
-    test_transform = transform_no_augment = transforms.Compose([
-                        transforms.Resize(size=(args.image_size, args.image_size)),
-                        transforms.ToTensor(),
-                        normalize
-                    ])
-    
-    sample = test_transform(Image.open(args.sample_dir)).unsqueeze(0).to(device)
-
-    gen_pred_vis(tree, sample, args.sample_dir, args.results_dir, args, classes)
-
+    parsed_args = parser.parse_args()
+    if not parsed_args.tree_dir:
+        parser.error('Missing path to Prototree (--tree_dir')
+    return parsed_args
 
 
 if __name__ == '__main__':
     args = get_local_expl_args()
-    try:
-        Image.open(args.sample_dir)
-        print("Image to explain: ", args.sample_dir)
-        explain_local(args)
-    except: #folder is not image
-        class_name = args.sample_dir.split('/')[-1]
-        if not os.path.exists(os.path.join(os.path.join(args.log_dir, args.results_dir),class_name)):
-            os.makedirs(os.path.join(os.path.join(args.log_dir, args.results_dir),class_name))
+
+    # Log which device was actually used
+    print('Device used: ', args.device)
+
+    # Load trained ProtoTree
+    tree = ProtoTree.load(args.tree_dir, map_location=args.device)
+    # Obtain the dataset and dataloaders
+    _, _, _, classes, _ = get_dataloaders(
+        dataset=args.dataset,
+        projection_mode=None,
+        batch_size=args.batch_size,
+        device=args.device,
+    )
+    mean = (0.485, 0.456, 0.406)
+    std = (0.229, 0.224, 0.225)
+    normalize = transforms.Normalize(mean=mean, std=std)
+    test_transform = transforms.Compose([
+        transforms.Resize(size=(args.image_size, args.image_size)),
+        transforms.ToTensor(),
+        normalize
+    ])
+
+    img_list = []
+    os.makedirs(os.path.join(args.root_dir, args.results_dir), exist_ok=True)
+    if os.path.isdir(args.sample_dir):
+        assert not args.seg_dir or os.path.isdir(args.seg_dir), "--seg_dir should point to a directory"
+        class_name = args.sample_dir.strip('/').split('/')[-1]
+        os.makedirs(os.path.join(os.path.join(args.root_dir, args.results_dir), class_name), exist_ok=True)
         for filename in os.listdir(args.sample_dir):
-            print(filename)
-            if filename.endswith(".jpg") or filename.endswith(".png"): 
-                args_1 = deepcopy(args)
-                args_1.sample_dir = args.sample_dir+"/"+filename
-                args_1.results_dir = os.path.join(args.results_dir, class_name)
-                explain_local(args_1)
+            if filename.endswith(".jpg") or filename.endswith(".png"):
+                img_list.append((os.path.join(args.sample_dir, filename), os.path.join(args.results_dir, class_name)))
+    else:
+        if args.sample_dir.endswith(".jpg") or args.sample_dir.endswith(".png"):
+            img_list.append((args.sample_dir, args.results_dir))
+    avg_overlap = 0.0
+    for img_path, output_path in img_list:
+        seg_path = os.path.join(args.seg_dir,
+                                os.path.splitext(os.path.basename(img_path))[0]+'.png') if args.seg_dir else None
+        assert seg_path is None or os.path.isfile(seg_path)
+        print(img_path)
+        avg_overlap += gen_pred_vis(
+            tree=tree,
+            img_tensor=test_transform(Image.open(img_path)).unsqueeze(0).to(args.device),
+            img_path=img_path,
+            seg_path=seg_path,
+            proj_dir=os.path.join(args.root_dir, args.proj_dir),
+            output_dir=os.path.join(args.root_dir, output_path),
+            classes=classes,
+            upsample_threshold=args.upsample_threshold,
+            upsample_mode=args.upsample_mode,
+            grads_x_input=args.grads_x_input,
+        )
+    print(f'Average overlap for {args.sample_dir}: {avg_overlap/len(img_list):.2f}')
