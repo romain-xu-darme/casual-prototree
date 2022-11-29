@@ -83,9 +83,10 @@ def get_overlap_stats(
             # Measure how much this bounding box intersects with the object
             overlap = sum([seg[y, x].any() != 0 for y in range(ymin, ymax) for x in range(xmin, xmax)])
             bbox_area = ((ymax - ymin) * (xmax - xmin))
+            img_area = grads.shape[0]*grads.shape[1]
             overlap /= bbox_area
             # [ depth in the tree, threshold value, bbox area, percentage of overlap ]
-            stats.append([i, threshold, bbox_area, overlap])
+            stats.append([i, threshold, bbox_area/img_area, overlap])
 
     return int(label_ix), stats
 
