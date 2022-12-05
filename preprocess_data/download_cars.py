@@ -1,11 +1,11 @@
 import requests
 import tarfile
 
-train_url = 'http://imagenet.stanford.edu/internal/car196/cars_train.tgz'
-test_url = 'http://imagenet.stanford.edu/internal/car196/cars_test.tgz'
+train_url = 'http://ai.stanford.edu/~jkrause/car196/cars_train.tgz'
+test_url = 'http://ai.stanford.edu/~jkrause/car196/cars_test.tgz'
 devkit_url = 'https://ai.stanford.edu/~jkrause/cars/car_devkit.tgz'
-test_anno_url = 'http://imagenet.stanford.edu/internal/car196/cars_test_annos_withlabels.mat'
-bb_anno_url = 'http://imagenet.stanford.edu/internal/car196/cars_annos.mat'
+test_anno_url = 'http://ai.stanford.edu/~jkrause/car196/cars_test_annos_withlabels.mat'
+bb_anno_url = 'http://ai.stanford.edu/~jkrause/car196/cars_annos.mat'
 
 target_path_train = './data/cars/cars_train.tgz'
 target_path_test = './data/cars/cars_test.tgz'
