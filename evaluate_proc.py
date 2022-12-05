@@ -147,7 +147,7 @@ if __name__ == '__main__':
     seg_set = torchvision.datasets.ImageFolder(args.seg_dir)
 
     with open(args.output, 'a') as f:
-        f.write('path;label;pred;depth;overlap\n')
+        f.write('path;label;pred;depth;thres;area;overlap\n')
         stats_iter = tqdm(
             enumerate(zip(img_set, seg_set)),
             total=len(img_set),
@@ -166,5 +166,5 @@ if __name__ == '__main__':
                 upsample_mode=args.upsample_mode,
             )
             for stat in stats:
-                f.write(f'{img_name};{label};{pred};{stat[0]};{stat[1]:.1f};{int(stat[2])};{stat[3]:.2f}\n')
+                f.write(f'{img_name};{label};{pred};{stat[0]};{stat[1]:.1f};{stat[2]:.2f};{stat[3]:.2f}\n')
             f.flush()
