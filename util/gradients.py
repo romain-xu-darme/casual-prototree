@@ -111,10 +111,13 @@ def smoothgrads(
         # Location is predefined
         h, w = location
 
-    # Compute variance from noise ratio
-    sigma = (img_tensor.max() - img_tensor.min()).cpu().numpy() * noise
-    # Generate noisy images around original.
-    noisy_images = [img_tensor + torch.randn(img_tensor.shape).to(device) * sigma for _ in range(nsamples)]
+    if nsamples == 1:
+        noisy_images = [img_tensor]
+    else:
+        # Compute variance from noise ratio
+        sigma = (img_tensor.max() - img_tensor.min()).cpu().numpy() * noise
+        # Generate noisy images around original.
+        noisy_images = [img_tensor + torch.randn(img_tensor.shape).to(device) * sigma for _ in range(nsamples)]
 
     # Compute gradients
     grads = []

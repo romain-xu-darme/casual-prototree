@@ -81,7 +81,7 @@ def get_overlap_stats(
             ymin, ymax = high_act_patch_indices[0], high_act_patch_indices[1]
             xmin, xmax = high_act_patch_indices[2], high_act_patch_indices[3]
             # Measure how much this bounding box intersects with the object
-            overlap = sum([seg[y, x].any() != 0 for y in range(ymin, ymax) for x in range(xmin, xmax)])
+            overlap = np.sum(np.sum(seg[ymin:ymax, xmin:xmax], axis=2) > 0)
             bbox_area = ((ymax - ymin) * (xmax - xmin))
             img_area = grads.shape[0]*grads.shape[1]
             overlap /= bbox_area

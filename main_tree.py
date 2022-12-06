@@ -109,7 +109,7 @@ def run_tree(args: argparse.Namespace = None):
         epoch += 1
 
     # Create a csv log for storing the test accuracy, mean train accuracy and mean loss for each epoch
-    logged_values = ('test_acc', 'mean_total_loss', 'mean_train_acc', 'mean_train_crossentropy_loss_during_epoch')
+    logged_values = ('test_acc', 'mean_total_loss', 'mean_train_acc')
     log.create_log('log_epoch_overview', 'epoch', *logged_values)
 
     if epoch < args.epochs+1:
@@ -169,7 +169,7 @@ def run_tree(args: argparse.Namespace = None):
             best_test_acc = save_best_test_tree(
                 tree, optimizer, scheduler, epoch,
                 best_train_acc, original_test_acc, best_test_acc, leaf_labels, args, log)
-            stats = (original_test_acc, "n.a.", "n.a.", "n.a.")
+            stats = (original_test_acc, "n.a.", "n.a.")
             log.log_values('log_epoch_overview', epoch, *stats)
 
     '''
