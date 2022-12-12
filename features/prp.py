@@ -53,7 +53,7 @@ def canonize_tree(tree: ProtoTree, arch: str, device: str) -> ProtoTree:
     wrapped_add_on = [get_lrpwrapperformodule(
         copy.deepcopy(src_module),
         lrp_params_def1, lrp_layer2method)
-                         for _, src_module in tree._add_on.named_modules()][1:]
+                         for _, src_module in tree._add_on.named_modules() if not isinstance(src_module, nn.Sequential)]
     tree._add_on = nn.Sequential(*wrapped_add_on)
     # Add fields for compatibility with ProtoPNet
     tree.prototype_vectors = copy.deepcopy(tree.prototype_layer.prototype_vectors)
