@@ -78,7 +78,7 @@ def gen_pred_vis(
     :param grads_x_input: Use gradients x image to mask out parts of the image with low gradients
     :returns: Average percentage of overlap between parts positively compared and object segmentation
     """
-    assert upsample_mode in ['vanilla', 'smoothgrads'], f'Unsupported upsample mode {upsample_mode}'
+    assert upsample_mode in ['vanilla', 'smoothgrads', 'prp',], f'Unsupported upsample mode {upsample_mode}'
 
     # Create directory to store visualization
     img_name = img_path.split('/')[-1].split(".")[-2]

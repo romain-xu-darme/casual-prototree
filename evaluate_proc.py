@@ -11,7 +11,7 @@ import os
 import cv2
 import numpy as np
 from prototree.upsample import find_high_activation_crop
-from util.gradients import cubic_upsampling, smoothgrads, normalize_min_max
+from util.gradients import cubic_upsampling, smoothgrads, prp, normalize_min_max
 
 
 def get_overlap_stats(
@@ -30,7 +30,7 @@ def get_overlap_stats(
     :param upsample_mode: Either "vanilla" or "smoothgrads"
     :returns: Prediction, overlap statistics for each node used in positive reasoning
     """
-    assert upsample_mode in ['vanilla', 'smoothgrads'], f'Unsupported upsample mode {upsample_mode}'
+    assert upsample_mode in ['vanilla', 'smoothgrads', 'prp'], f'Unsupported upsample mode {upsample_mode}'
 
     # Preprocess segmentation
     seg = np.asarray(seg.convert('RGB'))
@@ -62,6 +62,16 @@ def get_overlap_stats(
                 img_tensor=img_tensor,
                 node_id=node_id,
                 location=None,
+            )
+        elif upsample_mode == 'prp':
+            grads = prp(
+                tree=tree,
+                img_tensor=img_tensor,
+                node_id=node_id,
+                location=None,
+                device=img_tensor.device,
+                normalize=False,
+                gaussian_ksize=5,
             )
         else:  # Smoothgrads
             grads = smoothgrads(

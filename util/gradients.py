@@ -4,6 +4,7 @@ from scipy.ndimage.filters import gaussian_filter
 from typing import Optional, Tuple
 
 from prototree.prototree import ProtoTree
+from features.prp import canonize_tree, l2_lrp_class
 
 
 def polarity_and_collapse(
@@ -133,6 +134,54 @@ def smoothgrads(
     # grads has shape (nsamples) x img_tensor.shape => average across all samples
     grads = np.mean(np.array(grads), axis=0)
 
+    # Post-processing
+    grads = polarity_and_collapse(grads, polarity=polarity, avg_chan=0)
+    if gaussian_ksize:
+        grads = gaussian_filter(grads, sigma=gaussian_ksize)
+    if normalize:
+        grads = normalize_min_max(grads)
+    return grads
+
+
+def prp(
+        tree: ProtoTree,
+        img_tensor: torch.Tensor,
+        node_id: int,
+        location: Tuple[int, int] = None,
+        device: Optional[str] = 'cpu',
+        polarity: Optional[str] = 'absolute',
+        gaussian_ksize: Optional[int] = 5,
+        normalize: Optional[bool] = True,
+) -> np.array:
+    """ Perform patch visualization using Prototyp Relevance Propagation
+        (https://www.sciencedirect.com/science/article/pii/S0031320322006513#bib0030)
+
+    :param tree: Prototree
+    :param img_tensor: Input image tensor
+    :param node_id: Node index
+    :param device: Target device
+    :param polarity: Polarity filter applied on gradients
+    :param gaussian_ksize: Size of Gaussian filter kernel
+    :param normalize: Perform min-max normalization on gradients
+    :return: gradient map
+    """
+    if not hasattr(tree, 'epsilon'):
+        tree = canonize_tree(tree, arch='resnet50', device=device)
+    tree.eval()
+    img_tensor.requires_grad = True
+
+    with torch.enable_grad():
+        # Partial forward
+        features = tree._net(img_tensor)
+        features = tree._add_on(features)
+        newl2 = l2_lrp_class.apply
+        similarities = newl2(features, tree)
+        # global max pooling
+        min_distances = tree.max_layer(similarities)
+        min_distances = min_distances.view(-1, tree.num_prototypes)
+        '''For individual prototype'''
+        (min_distances[:, node_id]).backward()
+    grads = img_tensor.grad.data[0].detach().cpu().numpy()
     # Post-processing
     grads = polarity_and_collapse(grads, polarity=polarity, avg_chan=0)
     if gaussian_ksize:

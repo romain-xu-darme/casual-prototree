@@ -4,6 +4,7 @@ import torchvision.models as models
 import torch.utils.model_zoo as model_zoo
 import os
 import copy
+from features.lrp_general6 import get_lrpwrapperformodule, bnafterconv_overwrite_intoconv, resetbn, sum_stacked2
 
 model_urls = {
     'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
@@ -217,10 +218,10 @@ class ResNet_features(nn.Module):
         '''
 
         return (self.block.num_layers * self.layers[0]
-              + self.block.num_layers * self.layers[1]
-              + self.block.num_layers * self.layers[2]
-              + self.block.num_layers * self.layers[3]
-              + 1)
+                + self.block.num_layers * self.layers[1]
+                + self.block.num_layers * self.layers[2]
+                + self.block.num_layers * self.layers[3]
+                + 1)
 
 
     def __repr__(self):
@@ -254,6 +255,7 @@ def resnet34_features(pretrained=False, **kwargs):
         model.load_state_dict(my_dict, strict=False)
     return model
 
+
 def resnet50_features(pretrained=False, **kwargs):
     """Constructs a ResNet-50 model.
     Args:
@@ -267,6 +269,7 @@ def resnet50_features(pretrained=False, **kwargs):
         model.load_state_dict(my_dict, strict=False)
     return model
 
+
 def resnet50_features_inat(pretrained=False, **kwargs):
     """Constructs a ResNet-50 model.
     Args:
@@ -275,21 +278,22 @@ def resnet50_features_inat(pretrained=False, **kwargs):
     model = ResNet_features(Bottleneck, [3, 4, 6, 3], **kwargs)
 
     if pretrained:
-        #use BBN pretrained weights of the conventional learning branch (from BBN.iNaturalist2017.res50.180epoch.best_model.pth)
-        #https://openaccess.thecvf.com/content_CVPR_2020/papers/Zhou_BBN_Bilateral-Branch_Network_With_Cumulative_Learning_for_Long-Tailed_Visual_Recognition_CVPR_2020_paper.pdf
-        model_dict = torch.load(os.path.join(os.path.join('features', 'state_dicts'), 'BBN.iNaturalist2017.res50.180epoch.best_model.pth'))
+        # use BBN pretrained weights of the conventional learning branch (from BBN.iNaturalist2017.res50.180epoch.best_model.pth)
+        # https://openaccess.thecvf.com/content_CVPR_2020/papers/Zhou_BBN_Bilateral-Branch_Network_With_Cumulative_Learning_for_Long-Tailed_Visual_Recognition_CVPR_2020_paper.pdf
+        model_dict = torch.load(
+            os.path.join(os.path.join('features', 'state_dicts'), 'BBN.iNaturalist2017.res50.180epoch.best_model.pth'))
         # rename last residual block from cb_block to layer4.2
         new_model = copy.deepcopy(model_dict)
         for k in model_dict.keys():
             if k.startswith('module.backbone.cb_block'):
                 splitted = k.split('cb_block')
-                new_model['layer4.2'+splitted[-1]]=model_dict[k]
+                new_model['layer4.2' + splitted[-1]] = model_dict[k]
                 del new_model[k]
             elif k.startswith('module.backbone.rb_block'):
                 del new_model[k]
             elif k.startswith('module.backbone.'):
                 splitted = k.split('backbone.')
-                new_model[splitted[-1]]=model_dict[k]
+                new_model[splitted[-1]] = model_dict[k]
                 del new_model[k]
             elif k.startswith('module.classifier'):
                 del new_model[k]
@@ -326,19 +330,213 @@ def resnet152_features(pretrained=False, **kwargs):
     return model
 
 
-if __name__ == '__main__':
+class Cannotloadmodelweightserror(Exception):
+    pass
 
-    r18_features = resnet18_features(pretrained=True)
-    print(r18_features)
 
-    r34_features = resnet34_features(pretrained=True)
-    print(r34_features)
+class Modulenotfounderror(Exception):
+    pass
 
-    r50_features = resnet50_features(pretrained=True)
-    print(r50_features)
 
-    r101_features = resnet101_features(pretrained=True)
-    print(r101_features)
+class BasicBlock_fused(BasicBlock):
+    expansion = 1
 
-    r152_features = resnet152_features(pretrained=True)
-    print(r152_features)
+    def __init__(self, inplanes, planes, stride=1, downsample=None):
+        super(BasicBlock_fused, self).__init__(inplanes, planes, stride, downsample)
+
+        # own
+        self.elt = sum_stacked2()  # eltwisesum2()
+
+    def forward(self, x):
+        identity = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+
+        if self.downsample is not None:
+            identity = self.downsample(x)
+
+        # out += identity
+        # out = self.relu(out)
+
+        out = self.elt(torch.stack([out, identity], dim=0))  # self.elt(out,identity)
+        out = self.relu(out)
+
+        return out
+
+
+class Bottleneck_fused(Bottleneck):
+    # Bottleneck in torchvision places the stride for downsampling at 3x3 convolution(self.conv2)
+    # while original implementation places the stride at the first 1x1 convolution(self.conv1)
+    # according to "Deep residual learning for image recognition"https://arxiv.org/abs/1512.03385.
+    # This variant is also known as ResNet V1.5 and improves accuracy according to
+    # https://ngc.nvidia.com/catalog/model-scripts/nvidia:resnet_50_v1_5_for_pytorch.
+
+    expansion = 4
+
+    def __init__(self, inplanes, planes, stride=1, downsample=None):
+        super(Bottleneck_fused, self).__init__(inplanes, planes, stride, downsample)
+
+        # own
+        self.elt = sum_stacked2()  # eltwisesum2()
+
+    def forward(self, x):
+        identity = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = self.relu(out)
+
+        out = self.conv3(out)
+        out = self.bn3(out)
+
+        if self.downsample is not None:
+            identity = self.downsample(x)
+
+        # out += identity
+        out = self.elt(torch.stack([out, identity], dim=0))  # self.elt(out,identity)
+        out = self.relu(out)
+
+        return out
+
+
+class ResNetCanonized(ResNet_features):
+
+    def __init__(self, block, layers, num_classes=1000, zero_init_residual=False):
+        super(ResNetCanonized, self).__init__(block, layers, num_classes=1000, zero_init_residual=False)
+
+    def setbyname(self, name, value):
+
+        def iteratset(obj, components, value):
+
+            if not hasattr(obj, components[0]):
+                return False
+            elif len(components) == 1:
+                setattr(obj, components[0], value)
+                return True
+            else:
+                nextobj = getattr(obj, components[0])
+                return iteratset(nextobj, components[1:], value)
+
+        components = name.split('.')
+        success = iteratset(self, components, value)
+        return success
+
+    def copyfrom(self, net, lrp_params, lrp_layer2method):
+        updated_layers_names = []
+
+        last_src_module_name = None
+        last_src_module = None
+
+        for src_module_name, src_module in net.named_modules():
+            if isinstance(src_module, nn.Linear):
+                wrapped = get_lrpwrapperformodule(copy.deepcopy(src_module), lrp_params, lrp_layer2method)
+                if not self.setbyname(src_module_name, wrapped):
+                    raise Modulenotfounderror("could not find module " + src_module_name + " in target net to copy")
+                updated_layers_names.append(src_module_name)
+
+            if isinstance(src_module, nn.Conv2d):
+                # store conv2d layers
+                last_src_module_name = src_module_name
+                last_src_module = src_module
+
+            if isinstance(src_module, nn.BatchNorm2d):
+                # conv-bn chain
+                thisis_inputconv_andiwant_zbeta = lrp_params['use_zbeta'] and (last_src_module_name == 'conv1')
+                m = copy.deepcopy(last_src_module)
+                m = bnafterconv_overwrite_intoconv(m, bn=src_module)
+                # wrap conv
+                wrapped = get_lrpwrapperformodule(m, lrp_params, lrp_layer2method,
+                                                  thisis_inputconv_andiwant_zbeta=thisis_inputconv_andiwant_zbeta)
+                if not self.setbyname(last_src_module_name, wrapped):
+                    raise Modulenotfounderror(
+                        "could not find module " + last_src_module_name + " in target net to copy")
+                updated_layers_names.append(last_src_module_name)
+
+                # wrap batchnorm
+                wrapped = get_lrpwrapperformodule(resetbn(src_module), lrp_params, lrp_layer2method)
+                if not self.setbyname(src_module_name, wrapped):
+                    raise Modulenotfounderror("could not find module " + src_module_name + " in target net to copy")
+                updated_layers_names.append(src_module_name)
+
+        # sum_stacked2 is present only in the targetclass, so must iterate here
+        for target_module_name, target_module in self.named_modules():
+            if isinstance(target_module, (nn.ReLU, nn.AdaptiveAvgPool2d, nn.MaxPool2d)):
+                wrapped = get_lrpwrapperformodule(target_module, lrp_params, lrp_layer2method)
+                if not self.setbyname(target_module_name, wrapped):
+                    raise Modulenotfounderror("could not find module " + target_module_name + " in target net to copy")
+                updated_layers_names.append(target_module_name)
+
+            if isinstance(target_module, sum_stacked2):
+                wrapped = get_lrpwrapperformodule(target_module, lrp_params, lrp_layer2method)
+                if not self.setbyname(target_module_name, wrapped):
+                    raise Modulenotfounderror(
+                        "could not find module " + target_module_name + " in target net , impossible!")
+                updated_layers_names.append(target_module_name)
+
+        # for target_module_name, target_module in self.named_modules():
+        #     if target_module_name not in updated_layers_names:
+        #         if not target_module_name.endswith('.module'):
+        #             print('not updated:', target_module_name)
+
+
+def _ResNetCanonized(arch, block, layers, **kwargs):
+    return ResNetCanonized(block, layers, **kwargs)
+
+
+def resnet18_canonized(pretrained=False, progress=True, **kwargs):
+    r"""ResNet-18 model from
+    `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    return _ResNetCanonized('resnet18', BasicBlock_fused, [2, 2, 2, 2], pretrained, progress, **kwargs)
+
+
+def resnet50_canonized(pretrained=False, progress=True, **kwargs):
+    r"""ResNet-50 model from
+    `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    return _ResNetCanonized('resnet50', Bottleneck_fused, [3, 4, 6, 3], **kwargs)
+
+
+def resnet34_canonized(pretrained=False, progress=True, **kwargs):
+    r"""ResNet-18 model from
+    `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    return _ResNetCanonized('resnet34', BasicBlock_fused, [3, 4, 6, 3], **kwargs)
+
+
+def resnet152_canonized(pretrained=False, progress=True, **kwargs):
+    r"""ResNet-18 model from
+    `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    return _ResNetCanonized('resnet152', Bottleneck_fused, [3, 8, 36, 3], **kwargs)
+
+
+def resnet101_canonized(pretrained=False, progress=True, **kwargs):
+    r"""ResNet-18 model from
+    `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    return _ResNetCanonized('resnet101', Bottleneck_fused, [3, 4, 23, 3], **kwargs)
