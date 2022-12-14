@@ -80,10 +80,10 @@ def smoothgrads(
         img_tensor: torch.Tensor,
         node_id: int,
         location: Tuple[int, int] = None,
-        device: Optional[str] = 'cpu',
+        device: Optional[str] = 'cuda:0',
         polarity: Optional[str] = 'absolute',
         gaussian_ksize: Optional[int] = 5,
-        normalize: Optional[bool] = True,
+        normalize: Optional[bool] = False,
         nsamples: Optional[int] = 10,
         noise: Optional[float] = 0.2,
 ) -> np.array:
@@ -148,10 +148,10 @@ def prp(
         img_tensor: torch.Tensor,
         node_id: int,
         location: Tuple[int, int] = None,
-        device: Optional[str] = 'cpu',
+        device: Optional[str] = 'cuda:0',
         polarity: Optional[str] = 'absolute',
         gaussian_ksize: Optional[int] = 5,
-        normalize: Optional[bool] = True,
+        normalize: Optional[bool] = False,
 ) -> np.array:
     """ Perform patch visualization using Prototyp Relevance Propagation
         (https://www.sciencedirect.com/science/article/pii/S0031320322006513#bib0030)
@@ -176,9 +176,13 @@ def prp(
         features = tree._add_on(features)
         newl2 = l2_lrp_class.apply
         similarities = newl2(features, tree)
-        # global max pooling
-        min_distances = tree.max_layer(similarities)
-        min_distances = min_distances.view(-1, tree.num_prototypes)
+        if location is not None:
+            h, w = location
+            min_distances = similarities[:, :, h, w]
+        else:
+            # global max pooling
+            min_distances = tree.max_layer(similarities)
+            min_distances = min_distances.view(-1, tree.num_prototypes)
         '''For individual prototype'''
         (min_distances[:, node_id]).backward()
     grads = img_tensor.grad.data[0].detach().cpu().numpy()
