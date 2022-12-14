@@ -31,8 +31,9 @@ def has_max_prob_lower_threshold(node: Node, threshold: float):
 
 # Prune tree
 def prune(tree: ProtoTree, pruning_threshold_leaves: float, log: Log) -> None:
-    log.log_message("\nPruning...")
-    log.log_message("Before pruning: %s branches and %s leaves" % (tree.num_branches, tree.num_leaves))
+    if log:
+        log.log_message("\nPruning...")
+        log.log_message("Before pruning: %s branches and %s leaves" % (tree.num_branches, tree.num_leaves))
     num_prototypes_before = tree.num_branches
     node_idxs_to_prune = nodes_to_prune_based_on_leaf_dists_threshold(tree, pruning_threshold_leaves)
     to_prune = deepcopy(node_idxs_to_prune)
@@ -55,6 +56,7 @@ def prune(tree: ProtoTree, pruning_threshold_leaves: float, log: Log) -> None:
                 tree._parents[parent].l = sibling
             else:
                 tree._parents[parent].r = sibling
-    log.log_message("After pruning: %s branches and %s leaves" % (tree.num_branches, tree.num_leaves))
-    log.log_message("Fraction of prototypes pruned: %s"
+    if log:
+        log.log_message("After pruning: %s branches and %s leaves" % (tree.num_branches, tree.num_leaves))
+        log.log_message("Fraction of prototypes pruned: %s"
                     % ((num_prototypes_before-tree.num_branches)/float(num_prototypes_before))+'\n')
