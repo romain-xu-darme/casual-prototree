@@ -56,10 +56,9 @@ def canonize_tree(tree: ProtoTree, arch: str, device: str) -> ProtoTree:
                          for _, src_module in tree._add_on.named_modules() if not isinstance(src_module, nn.Sequential)]
     tree._add_on = nn.Sequential(*wrapped_add_on)
     # Add fields for compatibility with ProtoPNet
-    tree.prototype_vectors = copy.deepcopy(tree.prototype_layer.prototype_vectors)
     tree.max_layer = get_lrpwrapperformodule(torch.nn.MaxPool2d((7, 7), return_indices=False),
                                              lrp_params_def1, lrp_layer2method)
-    tree.ones = nn.Parameter(torch.ones(tree.prototype_vectors.shape),
+    tree.ones = nn.Parameter(torch.ones_like(tree.prototype_layer.prototype_vectors),
                              requires_grad=False)
     tree.epsilon = 1e-4
     return tree.to(device)

@@ -1121,21 +1121,21 @@ class l2_lrp(torch.autograd.Function):
 
 class l2_lrp_class(torch.autograd.Function):
 	@staticmethod
-	def forward(ctx, conv_features, model):
-		ctx.save_for_backward(conv_features, model.prototype_vectors)  # *values unpacks the list
+	def forward(ctx, conv_features, tree):
+		ctx.save_for_backward(conv_features, tree.prototype_layer.prototype_vectors)
 		x2 = conv_features ** 2
-		x2_patch_sum = F.conv2d(input=x2, weight=model.ones)
-		p2 = model.prototype_vectors ** 2
+		x2_patch_sum = F.conv2d(input=x2, weight=tree.ones)
+		p2 = tree.prototype_layer.prototype_vectors ** 2
 		p2 = torch.sum(p2, dim=(1, 2, 3))
 		# p2 is a vector of shape (num_prototypes,)
 		# then we reshape it to (num_prototypes, 1, 1)
 		p2_reshape = p2.view(-1, 1, 1)
 
-		xp = F.conv2d(input=conv_features, weight=model.prototype_vectors)
+		xp = F.conv2d(input=conv_features, weight=tree.prototype_layer.prototype_vectors)
 		intermediate_result = - 2 * xp + p2_reshape  # use broadcast
 		# x2_patch_sum and intermediate_result are of the same shape
 		distances = F.relu(x2_patch_sum + intermediate_result)
-		similarities = torch.log((distances + 1) / (distances + model.epsilon))
+		similarities = torch.log((distances + 1) / (distances + tree.epsilon))
 		return similarities
 
 	@staticmethod
