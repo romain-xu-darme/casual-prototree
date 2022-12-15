@@ -55,6 +55,11 @@ def create_parser() -> argparse.ArgumentParser:
                         metavar='<path>',
                         required=True,
                         help='Directory for saving the prototypes visualizations')
+    parser.add_argument('--stats_file',
+                        type=str,
+                        metavar='<name>',
+                        required=True,
+                        help='Stats file name inside projection directory.')
     parser.add_argument('--target_areas',
                         type=float,
                         nargs='+',
@@ -93,6 +98,7 @@ def compute_prototype_stats(
     :param img_name: Will be used in the statistic file
     :param target_areas: Target bounding box areas
     :param output_dir: Destination folder
+    :param output_filename: File name
     :param location: These coordinates are used to determine the upsampling target location
     :param device: Target device
     :param quiet: In quiet mode, does not create images with bounding boxes
@@ -174,7 +180,7 @@ def finalize_tree(args: argparse.Namespace = None):
     os.makedirs(args.proj_dir, exist_ok=True)
 
     # Reset stat file
-    open(os.path.join(args.proj_dir, 'prototype_stats.csv'), 'w')
+    open(os.path.join(args.proj_dir, args.stats_file), 'w')
 
     # Load tree
     tree, _, _, _ = load_checkpoint(args.tree_dir)
@@ -212,6 +218,7 @@ def finalize_tree(args: argparse.Namespace = None):
                 node_id=tree._out_map[node],
                 img_name=f'proto_{node_name}',
                 output_dir=args.proj_dir,
+                output_filename=args.stats_file,
                 target_areas=args.target_areas,
                 location=(prototype_location // H, prototype_location % H),
                 device=args.device,
