@@ -116,7 +116,7 @@ def smoothgrads(
         noisy_images = [img_tensor]
     else:
         # Compute variance from noise ratio
-        sigma = (img_tensor.max() - img_tensor.min()).cpu().numpy() * noise
+        sigma = (img_tensor.max() - img_tensor.min()).detach().cpu().numpy() * noise
         # Generate noisy images around original.
         noisy_images = [img_tensor + torch.randn(img_tensor.shape).to(device) * sigma for _ in range(nsamples)]
 
@@ -133,6 +133,7 @@ def smoothgrads(
 
     # grads has shape (nsamples) x img_tensor.shape => average across all samples
     grads = np.mean(np.array(grads), axis=0)
+    grads *= img_tensor[0].detach().cpu().numpy()
 
     # Post-processing
     grads = polarity_and_collapse(grads, polarity=polarity, avg_chan=0)
