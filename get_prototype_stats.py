@@ -4,7 +4,6 @@ from util.args import *
 from typing import List
 from util.data import get_dataloaders
 from prototree.prototree import ProtoTree
-from util.save import load_checkpoint
 from PIL import Image
 import matplotlib.pyplot as plt
 from prototree.prune import prune
@@ -103,7 +102,6 @@ def compute_prototype_stats(
     :param device: Target device
     :param quiet: In quiet mode, does not create images with bounding boxes
     """
-    # Mask out original image with segmentation if present
     segm = segm if segm is None else np.asarray(segm)
     img_bgr_uint8 = cv2.cvtColor(np.uint8(np.asarray(img)), cv2.COLOR_RGB2BGR)
 
@@ -183,8 +181,7 @@ def finalize_tree(args: argparse.Namespace = None):
     open(os.path.join(args.proj_dir, args.stats_file), 'w')
 
     # Load tree
-    tree, _, _, _ = load_checkpoint(args.tree_dir)
-    tree.to(args.device)
+    tree = ProtoTree.load(args.tree_dir, map_location=args.device)
     # Indicate backbone architecture for PRP canonization
     tree.base_arch = args.base_arch
 
