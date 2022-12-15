@@ -40,16 +40,16 @@ def log_learning_rates(optimizer, args: argparse.Namespace, log: Log):
         log.log_message("Learning rate prototypes: "+str(optimizer.param_groups[-1]['lr']))
 
 
-def average_distance_nearest_image(project_info: dict, tree: ProtoTree, log: Log, disable_log=False):
+def average_distance_nearest_image(project_info: dict, tree: ProtoTree, log: Log):
     distances = []
     for node, j in tree._out_map.items():
         if node in tree.branches:
             distances.append(project_info[j]['distance'])
-            if not disable_log:
+            if log:
                 log.log_message("Node %s has nearest distance %s (patch %d in image %d)"
                                 % (node.index, project_info[j]['distance'],
                                    project_info[j]['patch_ix'], project_info[j]['input_image_ix']))
-    if not disable_log:
+    if log:
         log.log_message("Euclidean distances from latent prototypes in tree to nearest image patch: %s"
                         % str(distances))
         log.log_message("Average Euclidean distance and standard deviation from latent prototype "
@@ -185,7 +185,7 @@ def analyse_ensemble(
     for i in range(len(trained_pruned_projected_trees)):
         info = project_infos[i]
         tree = trained_pruned_projected_trees[i]
-        distances += average_distance_nearest_image(info, tree, log, disable_log=True)
+        distances += average_distance_nearest_image(info, tree, None)
     log.log_message("Mean and standard deviation of distance from prototype to nearest training patch:\n "
                     + "mean="+str(np.mean(distances)) + ", std=" + str(np.std(distances)))
 

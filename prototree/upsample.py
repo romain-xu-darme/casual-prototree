@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from prototree.prototree import ProtoTree
 from util.log import Log
-from util.gradients import cubic_upsampling, smoothgrads, normalize_min_max
+from util.gradients import cubic_upsampling, smoothgrads, prp, normalize_min_max
 from skimage.filters import threshold_otsu
 from typing import Tuple
 
@@ -34,7 +34,7 @@ def upsample_prototypes(
     :param mode: Upsampling mode. Either 'vanilla' (cubic interpolation) or 'smoothgrads'
     :param grads_x_input: Use gradients x image to mask out parts of the image with low gradients
     """
-    assert mode in ['vanilla', 'smoothgrads'], f'Unsupported upsampling mode {mode}'
+    assert mode in ['vanilla', 'smoothgrads', 'prp'], f'Unsupported upsampling mode {mode}'
 
     os.makedirs(output_dir, exist_ok=True)
     log.log_message("\nUpsampling prototypes for visualization...")
@@ -92,7 +92,7 @@ def upsample_similarity_map(
     :param grads_x_input: Use gradients x image to mask out parts of the image with low gradients
     :returns: ratio of overlap between prototype bounding box and object when segmentation is given, 0 otherwise
     """
-    assert mode in ['vanilla', 'smoothgrads'], f'Unsupported upsampling mode {mode}'
+    assert mode in ['vanilla', 'smoothgrads', 'prp'], f'Unsupported upsampling mode {mode}'
 
     # Mask out original image with segmentation if present
     img = img if seg is None else ImageChops.multiply(img, seg)
@@ -109,6 +109,16 @@ def upsample_similarity_map(
             img_tensor=img_tensor,
             node_id=node_id,
             location=location,
+        )
+    elif mode == 'prp':
+        grads = prp(
+            tree=tree,
+            img_tensor=img_tensor,
+            node_id=node_id,
+            location=None,
+            device=img_tensor.device,
+            normalize=False,
+            gaussian_ksize=5
         )
     else:  # Smoothgrads
         grads = smoothgrads(

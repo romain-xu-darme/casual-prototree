@@ -134,8 +134,8 @@ def add_general_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
                         type=str,
                         metavar='<mode>',
                         default='vanilla',
-                        choices=['vanilla', 'smoothgrads'],
-                        help='Upsampling mode. Either vanilla (cubic interpolation) or Smoothgrads.')
+                        choices=['vanilla', 'smoothgrads', 'prp'],
+                        help='Upsampling mode. Either vanilla (cubic interpolation), smoothgrads or prp.')
     parser.add_argument('--grads_x_input',
                         action='store_true',
                         help='Flag that enables use of gradients x input for refined bounding boxes')

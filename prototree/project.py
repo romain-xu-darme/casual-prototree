@@ -109,7 +109,8 @@ def project_with_class_constraints(
         device: str,
         log: Log,
 ) -> Tuple[dict, ProtoTree]:
-    log.log_message("\nProjecting prototypes to nearest training patch (with class restrictions)...")
+    if log:
+        log.log_message("\nProjecting prototypes to nearest training patch (with class restrictions)...")
     # Set the model to evaluation mode
     tree.eval()
     torch.cuda.empty_cache()
