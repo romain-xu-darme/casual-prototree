@@ -94,8 +94,6 @@ def upsample_similarity_map(
     """
     assert mode in ['vanilla', 'smoothgrads', 'prp'], f'Unsupported upsampling mode {mode}'
 
-    # Mask out original image with segmentation if present
-    img = img if seg is None else ImageChops.multiply(img, seg)
     seg = seg if seg is None else np.asarray(seg)
     x_np = np.asarray(img)
     x_np = np.float32(x_np) / 255
