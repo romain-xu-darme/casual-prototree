@@ -2,7 +2,7 @@ import os
 import cv2
 import torch
 import numpy as np
-from PIL import Image, ImageChops
+from PIL import Image
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from prototree.prototree import ProtoTree
@@ -210,6 +210,58 @@ def find_high_activation_crop(mask, threshold):
             upper_x = j
             break
     return lower_y, upper_y+1, lower_x, upper_x+1
+
+
+def find_threshold_to_area(
+        grads: np.array,
+        area: float,
+        precision: float = 0.01,
+        ntries: int = 30
+) -> Tuple[int, int, int, int, float]:
+    """ Given a gradient heatmap and a target area, determine the optimum threshold to achieve a bounding box
+    with desired area, within a given number of tries
+
+    :param grads: Heatmap (normalized between 0 and 1)
+    :param area: Desired area
+    :param precision: Area precision
+    :param ntries: Number of attempts
+    :returns: Bounding box parameters (xmin, xmax, ymin, ymax) and effective area
+    """
+    # Find optimal threshold through dichotomic search
+    tmin = 0.0
+    tmax = 1.0
+    xmin = xmax = ymin = ymax = area_ratio = 0
+    for itry in range(ntries):
+        tcur = (tmax + tmin) / 2
+        # Compute corresponding bounding box
+        high_act_patch_indices = find_high_activation_crop(grads, tcur)
+        ymin, ymax = high_act_patch_indices[0], high_act_patch_indices[1]
+        xmin, xmax = high_act_patch_indices[2], high_act_patch_indices[3]
+        bbox_area = ((ymax - ymin) * (xmax - xmin))
+        img_area = grads.shape[0] * grads.shape[1] * 1.0
+        area_ratio = float(bbox_area / img_area)
+        if abs(area_ratio - area) <= precision:
+            # Found acceptable bounding box
+            break
+        else:
+            if area_ratio > area:
+                tmax = tcur
+            else:
+                tmin = tcur
+    return xmin, xmax, ymin, ymax, area_ratio
+
+
+def convert_bbox_coordinates(
+        xmin: int, xmax: int, ymin: int, ymax: int,
+        src_width: int, src_height: int,
+        dst_width: int, dst_height: int
+) -> Tuple[int, int, int, int]:
+    """ Convert bounding box coordinates from one image dimension to another """
+    xmin_resized = int(xmin * dst_width / src_width)
+    xmax_resized = int(xmax * dst_width / src_width)
+    ymin_resized = int(ymin * dst_height / src_height)
+    ymax_resized = int(ymax * dst_height / src_height)
+    return xmin_resized, xmax_resized, ymin_resized, ymax_resized
 
 
 # copied from protopnet
