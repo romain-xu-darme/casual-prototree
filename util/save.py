@@ -67,6 +67,8 @@ def load_checkpoint(directory_path: str) -> \
 
     # Load all arguments
     args = load_args(directory_path)
+    if not hasattr(args, 'device'):
+        args.device = 'cpu'
 
     # Load tree, optimizer, scheduler
     tree = ProtoTree.load(directory_path, map_location=args.device)
