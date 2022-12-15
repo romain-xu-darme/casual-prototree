@@ -65,7 +65,9 @@ for k in range(num):
     print('%s' % images[k][0].split(' ')[1].split('/')[1])
 
 train_full_save_path = os.path.join(path, 'dataset/train_full/')
+train_seg_save_path = os.path.join(path, 'dataset/train_full_seg/') if use_segmentation else None
 train_save_path = os.path.join(path, 'dataset/train_corners/')
+train_seg_corners_save_path = os.path.join(path, 'dataset/train_corners_seg/')
 test_save_path = os.path.join(path, 'dataset/test_full/')
 test_seg_save_path = os.path.join(path, 'dataset/test_full_seg/') if use_segmentation else None
 
@@ -77,35 +79,48 @@ for k in range(num):
     if int(split[k][0][-1]) == 1:
         if not os.path.isdir(train_full_save_path + file_name):
             os.makedirs(os.path.join(train_full_save_path, file_name))
+        if use_segmentation and not os.path.isdir(os.path.join(train_seg_save_path, file_name)):
+            os.makedirs(os.path.join(train_seg_save_path, file_name))
         shutil.copy(path + 'images/' + images[k][0].split(' ')[1],
                     os.path.join(
                         os.path.join(train_full_save_path, file_name),
                         images[k][0].split(' ')[1].split('/')[1]))
-
+        if use_segmentation:
+            seg_fname = os.path.splitext(images[k][0].split(' ')[1])[0] + '.png'
+            shutil.copy(os.path.join(path, 'segmentations', seg_fname),
+                        os.path.join(train_seg_save_path, file_name, seg_fname.split('/')[1]))
         if not os.path.isdir(train_save_path + file_name):
             os.makedirs(os.path.join(train_save_path, file_name))
-        img = Image.open(os.path.join(os.path.join(path, 'images'), images[k][0].split(' ')[1])).convert('RGB')
-        x, y, w, h = bboxes[id]
-        width, height = img.size
+        if use_segmentation and not os.path.isdir(train_seg_corners_save_path + file_name):
+            os.makedirs(os.path.join(train_seg_corners_save_path, file_name))
 
-        hmargin = int(0.1 * h)
-        wmargin = int(0.1 * w)
+        if use_segmentation:
+            seg_fname = os.path.splitext(images[k][0].split(' ')[1])[0] + '.png'
+            os.path.join(path, 'segmentations', seg_fname)
+        def corners_img(img_path, dir_path, suffix):
+            img = Image.open(img_path).convert('RGB')
+            x, y, w, h = bboxes[id]
+            width, height = img.size
+            hmargin = int(0.1 * h)
+            wmargin = int(0.1 * w)
 
-        cropped_img = img.crop((0, 0, min(x + w + wmargin, width), min(y + h + hmargin, height)))
-        cropped_img.save(os.path.join(os.path.join(train_save_path, file_name),
-                                      "upperleft_" + images[k][0].split(' ')[1].split('/')[1]))
-        cropped_img = img.crop((0, max(y - hmargin, 0), min(x + w + wmargin, width), height))
-        cropped_img.save(os.path.join(os.path.join(train_save_path, file_name),
-                                      "lowerleft_" + images[k][0].split(' ')[1].split('/')[1]))
-        cropped_img = img.crop((max(x - wmargin, 0), 0, width, min(y + h + hmargin, height)))
-        cropped_img.save(os.path.join(os.path.join(train_save_path, file_name),
-                                      "upperright_" + images[k][0].split(' ')[1].split('/')[1]))
-        cropped_img = img.crop(((max(x - wmargin, 0), max(y - hmargin, 0), width, height)))
-        cropped_img.save(os.path.join(os.path.join(train_save_path, file_name),
-                                      "lowerright_" + images[k][0].split(' ')[1].split('/')[1]))
+            cropped_img = img.crop((0, 0, min(x + w + wmargin, width), min(y + h + hmargin, height)))
+            cropped_img.save(os.path.join(dir_path, file_name,"upperleft_" + suffix))
+            cropped_img = img.crop((0, max(y - hmargin, 0), min(x + w + wmargin, width), height))
+            cropped_img.save(os.path.join(dir_path, file_name,"lowerleft_" + suffix))
+            cropped_img = img.crop((max(x - wmargin, 0), 0, width, min(y + h + hmargin, height)))
+            cropped_img.save(os.path.join(dir_path, file_name, "upperright_" + suffix))
+            cropped_img = img.crop(((max(x - wmargin, 0), max(y - hmargin, 0), width, height)))
+            cropped_img.save(os.path.join(dir_path, file_name, "lowerright_" + suffix))
+            img.save(os.path.join(dir_path, file_name,"normal_" + suffix))
 
-        img.save(os.path.join(os.path.join(train_save_path, file_name),
-                              "normal_" + images[k][0].split(' ')[1].split('/')[1]))
+        img_path = os.path.join(os.path.join(path, 'images'), images[k][0].split(' ')[1])
+        suffix = images[k][0].split(' ')[1].split('/')[1]
+        corners_img(img_path, train_save_path, suffix)
+        if use_segmentation:
+            seg_fname = os.path.splitext(images[k][0].split(' ')[1])[0] + '.png'
+            img_path = os.path.join(path, 'segmentations', seg_fname)
+            corners_img(img_path, train_seg_corners_save_path, suffix)
 
         print('%s' % images[k][0].split(' ')[1].split('/')[1])
     else:
