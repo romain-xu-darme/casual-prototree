@@ -111,7 +111,7 @@ def compute_inference_stats(
             with open(output, 'a') as fout:
                 for area, relevance, fidelity in zip(areas, relevances, fidelities):
                     fout.write(f'{img_name}, {label}, {int(label_ix)}, {node_id}, {depth}, '
-                               f'{mnames[method]}, {area}, {relevance}, {fidelity}\n')
+                               f'{mnames[method]}, {area:.3f}, {relevance:.3f}, {fidelity:.3f}\n')
 
 
 def get_args() -> argparse.Namespace:
