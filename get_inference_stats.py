@@ -195,9 +195,9 @@ def get_args() -> argparse.Namespace:
                         default=224,
                         help='Image size')
     parser.add_argument('--restart_from',
-                        type=int,
-                        metavar='<index>',
-                        help='Restart from a given image index')
+                        type=str,
+                        metavar='<name>',
+                        help='Restart from a given image')
     parser.add_argument('--random_seed',
                         type=int,
                         metavar='<seed>',
@@ -236,12 +236,12 @@ if __name__ == '__main__':
         total=len(img_set),
         desc='Computing fidelity stats')
     for index, (img, label) in stats_iter:
-        if wait and index != args.restart_from:
-            continue
-        wait = False
         img_path = img_set.samples[index][0]
         # Raw file name
         img_name = os.path.splitext(os.path.basename(img_path))[0]
+        if wait and img_name != args.restart_from:
+            continue
+        wait = False
         segm = Image.open(os.path.join(args.segm_dir, img_path.split('/')[-2], img_name + '.png')).convert('RGB') \
             if args.segm_dir is not None else None
         compute_inference_stats(
