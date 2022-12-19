@@ -1,7 +1,7 @@
 import torchvision.datasets
 import torchvision.transforms as transforms
 from prototree.prototree import ProtoTree
-from typing import List, Union
+from typing import List, Union, Callable
 from PIL import Image
 import argparse
 import torch
@@ -10,17 +10,21 @@ import os
 import copy
 import cv2
 import numpy as np
-from prototree.upsample import find_threshold_to_area, convert_bbox_coordinates
+from prototree.upsample import find_threshold_to_area, find_mask_to_area, convert_bbox_coordinates
 from util.gradients import smoothgrads, prp, cubic_upsampling, normalize_min_max
 from features.prp import canonize_tree
 
+mean = (0.485, 0.456, 0.406)
+std = (0.229, 0.224, 0.225)
 
 def compute_inference_stats(
         tree: ProtoTree,
         img: Image.Image,
         segm: Union[Image.Image, None],
         img_tensor: torch.Tensor,
+        transform: Callable,
         label: int,
+        mode: str,
         img_name: str,
         target_areas: List[float],
         output: str,
@@ -32,7 +36,9 @@ def compute_inference_stats(
     :param img: Original image
     :param segm: Image segmentation (if any)
     :param img_tensor: Input image tensor
+    :param transform: Preprocessing function (for generating masked images)
     :param label: Ground truth label
+    :param mode: Either bounding box or mask
     :param img_name: Image name
     :param target_areas: Find threshold such that bounding boxes cover a given area
     :param output: Path to output file
@@ -70,32 +76,53 @@ def compute_inference_stats(
                 img_tensor=copy.deepcopy(img_tensor),
                 node_id=node_id,
                 location=None,
+                device=device,
             )
             grads = cv2.resize(grads, dsize=(img.width, img.height), interpolation=cv2.INTER_CUBIC)
             grads = normalize_min_max(grads)
+            if mode == "mask":
+                # Sort gradients once
+                grads_sorted = np.sort(np.reshape(grads, (-1)))
 
             img_tensors = [img_tensor.clone().detach()]
             areas = []
             relevances = []
             for target_area in target_areas:
-                xmin, xmax, ymin, ymax, effective_area = find_threshold_to_area(grads, target_area)
-                areas.append(effective_area)
+                if mode == 'bbox':
+                    xmin, xmax, ymin, ymax, effective_area = find_threshold_to_area(grads, target_area)
+                    areas.append(effective_area)
 
-                # Measure intersection with segmentation (if provided)
-                relevance = np.sum(np.sum(segm[ymin:ymax, xmin:xmax], axis=2) > 0) if segm is not None else 0
-                relevance /= ((ymax - ymin) * (xmax - xmin))
-                relevances.append(relevance)
+                    # Measure intersection with segmentation (if provided)
+                    relevance = np.sum(np.sum(segm[ymin:ymax, xmin:xmax], axis=2) > 0) if segm is not None else 0
+                    relevance /= ((ymax - ymin) * (xmax - xmin))
+                    relevances.append(relevance)
 
-                # Accumulate perturbed images (will be processed in batch)
-                # WARNING: bounding box coordinates have been computed on original image dimension, we need to convert them
-                xmin_r, xmax_r, ymin_r, ymax_r = convert_bbox_coordinates(
-                    xmin, xmax, ymin, ymax,
-                    img.width, img.height,
-                    img_tensor.size(2), img_tensor.size(3),
-                )
-                deleted_img = img_tensor.clone().detach()
-                deleted_img[0, :, ymin_r:ymax_r, xmin_r:xmax_r] = 0
-                img_tensors.append(deleted_img)
+                    # Accumulate perturbed images (will be processed in batch)
+                    # WARNING: bounding box coordinates have been computed on original image dimension,
+                    # we need to convert them
+                    xmin_r, xmax_r, ymin_r, ymax_r = convert_bbox_coordinates(
+                        xmin, xmax, ymin, ymax,
+                        img.width, img.height,
+                        img_tensor.size(2), img_tensor.size(3),
+                    )
+                    deleted_img = img_tensor.clone().detach()
+                    deleted_img[0, :, ymin_r:ymax_r, xmin_r:xmax_r] = 0
+                    img_tensors.append(deleted_img)
+                else:
+                    # Get binary mask of most salient pixels
+                    mask, effective_area = find_mask_to_area(grads, grads_sorted, target_area)
+                    areas.append(effective_area)
+
+                    # Measure intersection with segmentation (if provided)
+                    relevance = np.sum((segm[:, :, 0]>0)*mask)*1.0 if segm is not None else 0.0
+                    relevance /= np.sum(mask)
+                    relevances.append(relevance)
+
+                    # Accumulate perturbed images (will be processed in batch)
+                    mask = np.expand_dims(mask, 2)
+                    # Set most salient pixels to mean value
+                    img_array = np.uint8(np.asarray(img) * (1-mask) + mask * mean * 255)
+                    img_tensors.append(transform(Image.fromarray(img_array)).unsqueeze(0).to(img_tensor.device))
 
             # Compute fidelities
             img_tensors = torch.cat(img_tensors, dim=0)
@@ -111,7 +138,7 @@ def compute_inference_stats(
             with open(output, 'a') as fout:
                 for area, relevance, fidelity in zip(areas, relevances, fidelities):
                     fout.write(f'{img_name}, {label}, {int(label_ix)}, {node_id}, {depth}, '
-                               f'{mnames[method]}, {area:.3f}, {relevance:.3f}, {fidelity:.3f}\n')
+                               f'{mnames[method]}, {area:.4f}, {relevance:.3f}, {fidelity:.3f}\n')
 
 
 def get_args() -> argparse.Namespace:
@@ -136,6 +163,12 @@ def get_args() -> argparse.Namespace:
                         type=str,
                         metavar='<path>',
                         help='Directory to segmentation of train images (if available)')
+    parser.add_argument('--mode',
+                        type=str,
+                        choices=['bbox', 'mask'],
+                        metavar='<mode>',
+                        default='bbox',
+                        help='Mode of extraction (either bounding box or more precise mask)')
     parser.add_argument('--batch_size',
                         type=int,
                         metavar='<num>',
@@ -178,8 +211,6 @@ if __name__ == '__main__':
     args = get_args()
 
     # Prepare preprocessing
-    mean = (0.485, 0.456, 0.406)
-    std = (0.229, 0.224, 0.225)
     normalize = transforms.Normalize(mean=mean, std=std)
     transform = transforms.Compose([
         transforms.Resize(size=(args.img_size, args.img_size)),
@@ -218,7 +249,9 @@ if __name__ == '__main__':
             img=img,
             segm=segm,
             img_tensor=transform(img).unsqueeze(0).to(args.device),
+            transform=transform,
             label=label,
+            mode=args.mode,
             img_name=img_name,
             target_areas=args.target_areas,
             output=args.output,
