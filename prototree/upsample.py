@@ -190,8 +190,14 @@ def upsample_similarity_map(
 
 
 # copied from protopnet
-def find_high_activation_crop(mask, threshold):
+def find_high_activation_crop(
+        mask: np.array,
+        threshold: float,
+        percentile_mode: bool = False
+):
     threshold = 1.-threshold
+    if percentile_mode:
+        threshold = np.percentile(mask, (1-threshold)*100)
     lower_y, upper_y, lower_x, upper_x = 0, 0, 0, 0
     for i in range(mask.shape[0]):
         if np.amax(mask[i]) > threshold:
@@ -249,6 +255,25 @@ def find_threshold_to_area(
             else:
                 tmin = tcur
     return xmin, xmax, ymin, ymax, area_ratio
+
+
+def find_mask_to_area(
+        grads: np.array,
+        sorted_grads: np.array,
+        area: float,
+) -> Tuple[np.array, float]:
+    """ Given a gradient heatmap and a target area, determine the optimum threshold to achieve a mask
+    with desired area
+
+    :param grads: Heatmap (normalized between 0 and 1)
+    :param sorted_grads: Sorted grads (if possible)
+    :param area: Desired area
+    :returns: Mask and effective area
+    """
+    sorted_grads = np.sort(np.reshape(grads, (-1))) if sorted_grads is None else sorted_grads
+    threshold = sorted_grads[int(len(sorted_grads)*(1-area))]
+    mask = (grads > threshold)
+    return mask, 1.0*np.sum(mask)/(mask.shape[0]*mask.shape[1])
 
 
 def convert_bbox_coordinates(
