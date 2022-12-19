@@ -94,7 +94,7 @@ def compute_inference_stats(
 
                     # Measure intersection with segmentation (if provided)
                     relevance = np.sum(np.sum(segm[ymin:ymax, xmin:xmax], axis=2) > 0) if segm is not None else 0
-                    relevance /= ((ymax - ymin) * (xmax - xmin))
+                    relevance /= (((ymax - ymin) * (xmax - xmin))+1e-14)
                     relevances.append(relevance)
 
                     # Accumulate perturbed images (will be processed in batch)
@@ -115,7 +115,7 @@ def compute_inference_stats(
 
                     # Measure intersection with segmentation (if provided)
                     relevance = np.sum((segm[:, :, 0]>0)*mask)*1.0 if segm is not None else 0.0
-                    relevance /= np.sum(mask)
+                    relevance /= (np.sum(mask)+1e-14)
                     relevances.append(relevance)
 
                     # Accumulate perturbed images (will be processed in batch)
