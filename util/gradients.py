@@ -50,6 +50,7 @@ def cubic_upsampling(
         img_tensor: torch.Tensor,
         node_id: int,
         location: Tuple[int, int] = None,
+        device: Optional[str] = None,
 ) -> np.array:
     """ Perform patch visualization using Cubic interpolation
 
@@ -57,7 +58,7 @@ def cubic_upsampling(
         :param img_tensor: Input image tensor
         :param node_id: Node index
         :param location: Coordinates of feature vector
-        :param device: Target device
+        :param device: Target device (unused)
         :return: interpolated similarity map
     """
     with torch.no_grad():
@@ -86,6 +87,7 @@ def smoothgrads(
         normalize: Optional[bool] = False,
         nsamples: Optional[int] = 10,
         noise: Optional[float] = 0.2,
+        grads_x_input: Optional[bool] = True,
 ) -> np.array:
     """ Perform patch visualization using SmoothGrad
 
@@ -99,6 +101,7 @@ def smoothgrads(
     :param normalize: Perform min-max normalization on gradients
     :param nsamples: Number of samples
     :param noise: Noise level
+    :param grads_x_input: Use gradient times input mode
     :return: gradient map
     """
     if location is None:
@@ -133,7 +136,8 @@ def smoothgrads(
 
     # grads has shape (nsamples) x img_tensor.shape => average across all samples
     grads = np.mean(np.array(grads), axis=0)
-    grads *= img_tensor[0].detach().cpu().numpy()
+    if grads_x_input:
+        grads *= img_tensor[0].detach().cpu().numpy()
 
     # Post-processing
     grads = polarity_and_collapse(grads, polarity=polarity, avg_chan=0)
@@ -160,6 +164,7 @@ def prp(
     :param tree: Prototree
     :param img_tensor: Input image tensor
     :param node_id: Node index
+    :param location: Coordinates of feature vector
     :param device: Target device
     :param polarity: Polarity filter applied on gradients
     :param gaussian_ksize: Size of Gaussian filter kernel
