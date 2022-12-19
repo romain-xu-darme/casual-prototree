@@ -1,14 +1,15 @@
 import copy
+import numpy as np
 from tqdm import tqdm
 from util.args import *
-from typing import List
+from typing import List, Callable
 from util.data import get_dataloaders
 from prototree.prototree import ProtoTree
 from PIL import Image
 import matplotlib.pyplot as plt
 from prototree.prune import prune
 from prototree.project import project_with_class_constraints
-from prototree.upsample import find_threshold_to_area, convert_bbox_coordinates
+from prototree.upsample import find_threshold_to_area, find_mask_to_area, convert_bbox_coordinates
 from util.gradients import smoothgrads, prp, cubic_upsampling, normalize_min_max
 from features.prp import canonize_tree
 import torch
@@ -39,6 +40,12 @@ def create_parser() -> argparse.ArgumentParser:
                         type=str,
                         metavar='<path>',
                         help='Directory to segmentation of train images (if available)')
+    parser.add_argument('--mode',
+                        type=str,
+                        choices=['bbox', 'mask'],
+                        metavar='<mode>',
+                        default='bbox',
+                        help='Mode of extraction (either bounding box or more precise mask)')
     parser.add_argument('--batch_size',
                         type=int,
                         metavar='<num>',
@@ -69,6 +76,9 @@ def create_parser() -> argparse.ArgumentParser:
                         metavar='<seed>',
                         default=0,
                         help='Random seed (for reproducibility)')
+    parser.add_argument('--quiet',
+                        action='store_true',
+                        help='Do not save debug images')
     add_finalize_args(parser)
     return parser
 
@@ -79,8 +89,10 @@ def compute_prototype_stats(
         segm: Image,
         img_tensor: torch.Tensor,
         node_id: int,
+        transform: Callable,
         img_name: str,
         target_areas: List[float],
+        mode: str,
         output_dir: str,
         output_filename: str = 'prototype_stats.csv',
         location: Tuple[int, int] = None,
@@ -94,8 +106,10 @@ def compute_prototype_stats(
     :param segm: Image segmentation (if any)
     :param img_tensor: Image tensor
     :param node_id: Node ID = index of the prototype in the similarity map
+    :param transform: Preprocessing function
     :param img_name: Will be used in the statistic file
     :param target_areas: Target bounding box areas
+    :param mode: Either bounding box or mask
     :param output_dir: Destination folder
     :param output_filename: File name
     :param location: These coordinates are used to determine the upsampling target location
@@ -103,11 +117,11 @@ def compute_prototype_stats(
     :param quiet: In quiet mode, does not create images with bounding boxes
     """
     segm = segm if segm is None else np.asarray(segm)
-    img_bgr_uint8 = cv2.cvtColor(np.uint8(np.asarray(img)), cv2.COLOR_RGB2BGR)
 
     # Use canonized tree for PRP
     canonized_tree = canonize_tree(copy.deepcopy(tree), arch=tree.base_arch, device=device)
     mnames = {smoothgrads: 'smoothgrads', prp: 'prp', cubic_upsampling: 'vanilla'}
+
     # Vanilla (white), PRP (purple) and Smoothgrads (yellow)
     for method, color in zip([cubic_upsampling, prp, smoothgrads], [(255, 255, 255),(255, 0, 255),(0, 255, 255)]):
         # Compute gradients
@@ -116,35 +130,53 @@ def compute_prototype_stats(
             img_tensor=copy.deepcopy(img_tensor),
             node_id=node_id,
             location=location,
+            device=device,
         )
         grads = cv2.resize(grads, dsize=(img.width, img.height), interpolation=cv2.INTER_CUBIC)
         grads = normalize_min_max(grads)
+        if mode == "mask":
+            # Sort gradients once
+            grads_sorted = np.sort(np.reshape(grads, (-1)))
 
         img_tensors = [img_tensor.clone().detach()]
         areas = []
         relevances = []
         for target_area in target_areas:
-            xmin, xmax, ymin, ymax, effective_area = find_threshold_to_area(grads, target_area)
-            areas.append(effective_area)
-            if target_area == 0.1:
-                # Update result image
-                cv2.rectangle(img_bgr_uint8, (xmin, ymin), (xmax-1, ymax-1), color, thickness=2)
+            if mode == 'bbox':
+                xmin, xmax, ymin, ymax, effective_area = find_threshold_to_area(grads, target_area)
+                areas.append(effective_area)
 
-            # Measure intersection with segmentation (if provided)
-            relevance = np.sum(np.sum(segm[ymin:ymax, xmin:xmax], axis=2) > 0) if segm is not None else 0
-            relevance /= ((ymax - ymin) * (xmax - xmin))
-            relevances.append(relevance)
+                # Measure intersection with segmentation (if provided)
+                relevance = np.sum(np.sum(segm[ymin:ymax, xmin:xmax], axis=2) > 0) if segm is not None else 0
+                relevance /= ((ymax - ymin) * (xmax - xmin))+1e-14
+                relevances.append(relevance)
 
-            # Accumulate perturbed images (will be processed in batch)
-            # WARNING: bounding box coordinates have been computed on original image dimension, we need to convert them
-            xmin_r, xmax_r, ymin_r, ymax_r = convert_bbox_coordinates(
-                xmin, xmax, ymin, ymax,
-                img.width, img.height,
-                img_tensor.size(2), img_tensor.size(3),
-            )
-            deleted_img = img_tensor.clone().detach()
-            deleted_img[0, :, ymin_r:ymax_r, xmin_r:xmax_r] = 0
-            img_tensors.append(deleted_img)
+                # Accumulate perturbed images (will be processed in batch)
+                # WARNING: bounding box coordinates have been computed on original image dimension, we need to convert them
+                xmin_r, xmax_r, ymin_r, ymax_r = convert_bbox_coordinates(
+                    xmin, xmax, ymin, ymax,
+                    img.width, img.height,
+                    img_tensor.size(2), img_tensor.size(3),
+                )
+                deleted_img = img_tensor.clone().detach()
+                deleted_img[0, :, ymin_r:ymax_r, xmin_r:xmax_r] = 0
+                img_tensors.append(deleted_img)
+            else:
+                # Get binary mask of most salient pixels
+                mask, effective_area = find_mask_to_area(grads, grads_sorted, target_area)
+                areas.append(effective_area)
+
+                # Measure intersection with segmentation (if provided)
+                relevance = np.sum((segm[:, :, 0] > 0) * mask) * 1.0 if segm is not None else 0.0
+                relevance /= (np.sum(mask) + 1e-14)
+                relevances.append(relevance)
+
+                # Accumulate perturbed images (will be processed in batch)
+                mask = np.expand_dims(mask, 2)
+                # Set most salient pixels to mean value
+                mean = transform.transforms[2].mean
+                img_array = np.uint8(np.asarray(img) * (1 - mask) + mask * mean * 255)
+                img_tensors.append(transform(Image.fromarray(img_array)).unsqueeze(0).to(img_tensor.device))
 
         # Compute fidelities
         img_tensors = torch.cat(img_tensors, dim=0)
@@ -155,14 +187,18 @@ def compute_prototype_stats(
         ref_similarity = sim_map[0, h, w]
         fidelities = sim_map[1:, h, w] / ref_similarity
 
+        # Compute intersection betwen 95 percentile mask and segmentation (default in ProtoPNet)
+        mask = grads > np.percentile(grads, 95)
+        relevance_95pc = np.sum((segm[:, :, 0] > 0) * mask) * 1.0 / (np.sum(mask) + 1e-14) if segm is not None else 0.0
+
         with open(os.path.join(output_dir, output_filename), 'a') as fout:
             for area, relevance, fidelity in zip(areas, relevances, fidelities):
-                fout.write(f'{img_name}, {node_id}, {mnames[method]}, {area}, {relevance}, {fidelity}\n')
+                fout.write(f'{img_name},{node_id},{mnames[method]},{area},{relevance},{fidelity}, {relevance_95pc}\n')
 
-    img_rgb_uint8 = img_bgr_uint8[..., ::-1]
-    img_rgb_float = np.float32(img_rgb_uint8) / 255
-    if not quiet:
-        plt.imsave(os.path.join(output_dir, f'{img_name}.png'), img_rgb_float)
+        if not quiet:
+            mask = np.expand_dims(mask, 2)
+            saved_image = np.uint8(np.asarray(img) * (1 - mask) + mask * (255, 255, 0))
+            Image.fromarray(saved_image).save(f'{output_dir}/{img_name}_{node_id}_{mnames[method]}.png')
 
 
 def finalize_tree(args: argparse.Namespace = None):
@@ -175,10 +211,14 @@ def finalize_tree(args: argparse.Namespace = None):
         batch_size=args.batch_size,
         device=args.device,
     )
+    # Recover preprocessing function
+    transform = projectloader.dataset.transform
+
     os.makedirs(args.proj_dir, exist_ok=True)
 
     # Reset stat file
-    open(os.path.join(args.proj_dir, args.stats_file), 'w')
+    with open(os.path.join(args.proj_dir, args.stats_file), 'w') as fout:
+        fout.write('image name,node id,method,area,relevance,fidelity,non biased\n')
 
     # Load tree
     tree = ProtoTree.load(args.tree_dir, map_location=args.device)
@@ -213,14 +253,16 @@ def finalize_tree(args: argparse.Namespace = None):
                 segm=segm,
                 img_tensor=prototype_info['nearest_input'],
                 node_id=tree._out_map[node],
+                transform=transform,
                 img_name=f'proto_{node_name}',
                 output_dir=args.proj_dir,
                 output_filename=args.stats_file,
                 target_areas=args.target_areas,
+                mode=args.mode,
                 location=(prototype_location // H, prototype_location % H),
                 device=args.device,
+                quiet=args.quiet,
             )
-
 
 if __name__ == '__main__':
     finalize_tree()
