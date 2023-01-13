@@ -51,6 +51,7 @@ def cubic_upsampling(
         node_id: int,
         location: Tuple[int, int] = None,
         device: Optional[str] = None,
+        select_highest: Optional[bool] = True,
 ) -> np.array:
     """ Perform patch visualization using Cubic interpolation
 
@@ -59,11 +60,14 @@ def cubic_upsampling(
         :param node_id: Node index
         :param location: Coordinates of feature vector
         :param device: Target device (unused)
+        :param select_highest: Keep only location of the highest activation
         :return: interpolated similarity map
     """
     with torch.no_grad():
         _, distances_batch, _ = tree.forward_partial(img_tensor)
         sim_map = torch.exp(-distances_batch[0, node_id]).cpu().numpy()
+    if not select_highest:
+        return sim_map
     if location is None:
         # Find location of feature vector with the highest similarity
         h, w = np.where(sim_map == np.max(sim_map))
