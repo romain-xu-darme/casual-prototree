@@ -89,6 +89,7 @@ def compute_prototype_stats(
         segm: Image,
         img_tensor: torch.Tensor,
         node_id: int,
+        depth: int,
         transform: Callable,
         img_name: str,
         target_areas: List[float],
@@ -106,6 +107,7 @@ def compute_prototype_stats(
     :param segm: Image segmentation (if any)
     :param img_tensor: Image tensor
     :param node_id: Node ID = index of the prototype in the similarity map
+    :param depth: Node depth inside the tree
     :param transform: Preprocessing function
     :param img_name: Will be used in the statistic file
     :param target_areas: Target bounding box areas
@@ -193,7 +195,8 @@ def compute_prototype_stats(
 
         with open(os.path.join(output_dir, output_filename), 'a') as fout:
             for area, relevance, fidelity in zip(areas, relevances, fidelities):
-                fout.write(f'{img_name},{node_id},{mnames[method]},{area},{relevance},{fidelity}, {relevance_95pc}\n')
+                fout.write(f'{img_name},{node_id},{depth},'
+                           f'{mnames[method]},{area},{relevance},{fidelity}, {relevance_95pc}\n')
 
         if not quiet:
             mask = np.expand_dims(mask, 2)
@@ -218,7 +221,7 @@ def finalize_tree(args: argparse.Namespace = None):
 
     # Reset stat file
     with open(os.path.join(args.proj_dir, args.stats_file), 'w') as fout:
-        fout.write('image name,node id,method,area,relevance,fidelity,non biased\n')
+        fout.write('image name,node id,depth,method,area,relevance,fidelity,non biased\n')
 
     # Load tree
     tree = ProtoTree.load(args.tree_dir, map_location=args.device)
@@ -253,6 +256,7 @@ def finalize_tree(args: argparse.Namespace = None):
                 segm=segm,
                 img_tensor=prototype_info['nearest_input'],
                 node_id=tree._out_map[node],
+                depth=len(tree.path_to(node)),
                 transform=transform,
                 img_name=f'proto_{node_name}',
                 output_dir=args.proj_dir,
