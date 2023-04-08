@@ -11,11 +11,17 @@ import copy
 import cv2
 import numpy as np
 from prototree.upsample import find_threshold_to_area, find_mask_to_area, convert_bbox_coordinates
-from util.gradients import smoothgrads, prp, cubic_upsampling, normalize_min_max
+from util.gradients import smoothgrads, prp, cubic_upsampling, randgrads, normalize_min_max
 from features.prp import canonize_tree
 
 mean = (0.485, 0.456, 0.406)
 std = (0.229, 0.224, 0.225)
+supported_methods = {
+    'smoothgrads': smoothgrads,
+    'prp': prp,
+    'vanilla': cubic_upsampling,
+    'randgrads': randgrads
+}
 
 def compute_inference_stats(
         tree: ProtoTree,
@@ -24,6 +30,7 @@ def compute_inference_stats(
         img_tensor: torch.Tensor,
         transform: Callable,
         label: int,
+        methods: List[str],
         mode: str,
         img_name: str,
         target_areas: List[float],
@@ -38,6 +45,7 @@ def compute_inference_stats(
     :param img_tensor: Input image tensor
     :param transform: Preprocessing function (for generating masked images)
     :param label: Ground truth label
+    :param methods: List of saliency methods
     :param mode: Either bounding box or mask
     :param img_name: Image name
     :param target_areas: Find threshold such that bounding boxes cover a given area
@@ -49,7 +57,6 @@ def compute_inference_stats(
 
     # Use canonized tree for PRP
     canonized_tree = canonize_tree(copy.deepcopy(tree), arch=tree.base_arch, device=device)
-    mnames = {smoothgrads: 'smoothgrads', prp: 'prp', cubic_upsampling: 'vanilla'}
 
     # Get the model prediction
     with torch.no_grad():
@@ -69,9 +76,10 @@ def compute_inference_stats(
         node_id = tree._out_map[node]
 
         # Vanilla (white), PRP (purple) and Smoothgrads (yellow)
-        for method in [cubic_upsampling, prp, smoothgrads]:
+        for method in methods:
+            func = supported_methods[method]
             # Compute gradients
-            grads = method(
+            grads = func(
                 tree=tree if method != prp else canonized_tree,
                 img_tensor=copy.deepcopy(img_tensor),
                 node_id=node_id,
@@ -137,8 +145,8 @@ def compute_inference_stats(
 
             with open(output, 'a') as fout:
                 for area, relevance, fidelity in zip(areas, relevances, fidelities):
-                    fout.write(f'{img_name}, {label}, {int(label_ix)}, {node_id}, {depth}, '
-                               f'{mnames[method]}, {area:.4f}, {relevance:.3f}, {fidelity:.3f}\n')
+                    fout.write(f'{img_name},{label},{int(label_ix)},{node_id},{depth},'
+                               f'{method},{area:.4f},{relevance:.3f},{fidelity:.3f}\n')
 
 
 def get_args() -> argparse.Namespace:
@@ -163,6 +171,11 @@ def get_args() -> argparse.Namespace:
                         type=str,
                         metavar='<path>',
                         help='Directory to segmentation of train images (if available)')
+    parser.add_argument('--methods',
+                        type=str, nargs='+',
+                        metavar='<name>',
+                        default=['smoothgrads', 'prp', 'vanilla', 'randgrads'],
+                        help='List of saliency methods')
     parser.add_argument('--mode',
                         type=str,
                         choices=['bbox', 'mask'],
@@ -251,6 +264,7 @@ if __name__ == '__main__':
             img_tensor=transform(img).unsqueeze(0).to(args.device),
             transform=transform,
             label=label,
+            methods=args.methods,
             mode=args.mode,
             img_name=img_name,
             target_areas=args.target_areas,

@@ -6,11 +6,10 @@ from typing import List, Callable
 from util.data import get_dataloaders
 from prototree.prototree import ProtoTree
 from PIL import Image
-import matplotlib.pyplot as plt
 from prototree.prune import prune
 from prototree.project import project_with_class_constraints
 from prototree.upsample import find_threshold_to_area, find_mask_to_area, convert_bbox_coordinates
-from util.gradients import smoothgrads, prp, cubic_upsampling, normalize_min_max
+from util.gradients import smoothgrads, prp, cubic_upsampling, randgrads, normalize_min_max
 from features.prp import canonize_tree
 import torch
 import cv2
@@ -18,6 +17,12 @@ import cv2
 # Use only deterministic algorithms
 torch.use_deterministic_algorithms(True)
 
+supported_methods = {
+    'smoothgrads': smoothgrads,
+    'prp': prp,
+    'vanilla': cubic_upsampling,
+    'randgrads': randgrads
+}
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser('Compare different upsampling modes when upsampling prototypes')
@@ -36,6 +41,11 @@ def create_parser() -> argparse.ArgumentParser:
                         metavar='<name>',
                         required=True,
                         help='Data set on which the ProtoTree has been trained')
+    parser.add_argument('--methods',
+                        type=str, nargs='+',
+                        metavar='<name>',
+                        default=['smoothgrads', 'prp', 'vanilla', 'randgrads'],
+                        help='List of saliency methods')
     parser.add_argument('--segm_dir',
                         type=str,
                         metavar='<path>',
@@ -89,6 +99,7 @@ def compute_prototype_stats(
         segm: Image,
         img_tensor: torch.Tensor,
         node_id: int,
+        methods: List[str],
         depth: int,
         transform: Callable,
         img_name: str,
@@ -107,6 +118,7 @@ def compute_prototype_stats(
     :param segm: Image segmentation (if any)
     :param img_tensor: Image tensor
     :param node_id: Node ID = index of the prototype in the similarity map
+    :param methods: List of saliency methods
     :param depth: Node depth inside the tree
     :param transform: Preprocessing function
     :param img_name: Will be used in the statistic file
@@ -122,12 +134,11 @@ def compute_prototype_stats(
 
     # Use canonized tree for PRP
     canonized_tree = canonize_tree(copy.deepcopy(tree), arch=tree.base_arch, device=device)
-    mnames = {smoothgrads: 'smoothgrads', prp: 'prp', cubic_upsampling: 'vanilla'}
 
-    # Vanilla (white), PRP (purple) and Smoothgrads (yellow)
-    for method, color in zip([cubic_upsampling, prp, smoothgrads], [(255, 255, 255),(255, 0, 255),(0, 255, 255)]):
+    for method in methods:
+        func = supported_methods[method]
         # Compute gradients
-        grads = method(
+        grads = func(
             tree=tree if method != prp else canonized_tree,
             img_tensor=copy.deepcopy(img_tensor),
             node_id=node_id,
@@ -196,12 +207,12 @@ def compute_prototype_stats(
         with open(os.path.join(output_dir, output_filename), 'a') as fout:
             for area, relevance, fidelity in zip(areas, relevances, fidelities):
                 fout.write(f'{img_name},{node_id},{depth},'
-                           f'{mnames[method]},{area},{relevance},{fidelity}, {relevance_95pc}\n')
+                           f'{method},{area},{relevance},{fidelity}, {relevance_95pc}\n')
 
         if not quiet:
             mask = np.expand_dims(mask, 2)
             saved_image = np.uint8(np.asarray(img) * (1 - mask) + mask * (255, 255, 0))
-            Image.fromarray(saved_image).save(f'{output_dir}/{img_name}_{node_id}_{mnames[method]}.png')
+            Image.fromarray(saved_image).save(f'{output_dir}/{img_name}_{node_id}_{method}.png')
 
 
 def finalize_tree(args: argparse.Namespace = None):
@@ -256,6 +267,7 @@ def finalize_tree(args: argparse.Namespace = None):
                 segm=segm,
                 img_tensor=prototype_info['nearest_input'],
                 node_id=tree._out_map[node],
+                methods=args.methods,
                 depth=len(tree.path_to(node)),
                 transform=transform,
                 img_name=f'proto_{node_name}',
