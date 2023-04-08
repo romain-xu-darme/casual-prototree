@@ -45,7 +45,7 @@ The folder `preprocess_data` contains python code to download, extract and prepr
 A ProtoTree can be trained by running `main_tree.py` with arguments. An example for CUB:
 ```bash
 main_tree.py
-	--num_features 256 --depth 9 --net resnet50_inat --dataset CUB-200-2011 \
+	--num_features 256 --depth 9 --net resnet50_inat --init_mode pretrained --dataset CUB-200-2011 \
 	--epochs 100 --lr 0.001 --lr_block 0.001 --lr_net 1e-5 --device cuda:0 \
 	--freeze_epochs 10 --milestones 60,70,80,90,100 --batch_size 64 --random_seed 42 \
 	--root_dir ~/runs/prototree  \
