@@ -9,6 +9,7 @@ from tqdm import tqdm
 import os
 import copy
 import cv2
+import random
 import numpy as np
 from prototree.upsample import find_threshold_to_area, find_mask_to_area, convert_bbox_coordinates
 from util.gradients import smoothgrads, prp, cubic_upsampling, randgrads, normalize_min_max
@@ -182,11 +183,6 @@ def get_args() -> argparse.Namespace:
                         metavar='<mode>',
                         default='bbox',
                         help='Mode of extraction (either bounding box or more precise mask)')
-    parser.add_argument('--batch_size',
-                        type=int,
-                        metavar='<num>',
-                        default=64,
-                        help='Batch size when training the model using minibatch gradient descent')
     parser.add_argument('--device',
                         type=str,
                         metavar='<device>',
@@ -199,8 +195,8 @@ def get_args() -> argparse.Namespace:
                         help='Path to stats file.')
     parser.add_argument('--target_areas',
                         type=float,
-                        nargs='+',
-                        metavar='<value>',
+                        nargs=3,
+                        metavar=('<min>','<max>','<increment>'),
                         help='Target bounding box areas')
     parser.add_argument('--img_size',
                         type=int,
@@ -222,6 +218,10 @@ def get_args() -> argparse.Namespace:
 
 if __name__ == '__main__':
     args = get_args()
+    # Init random seeds
+    torch.manual_seed(args.random_seed)
+    np.random.seed(args.random_seed)
+    random.seed(args.random_seed)
 
     # Prepare preprocessing
     normalize = transforms.Normalize(mean=mean, std=std)
@@ -240,9 +240,10 @@ if __name__ == '__main__':
 
     if not os.path.exists(args.output):
         with open(args.output, 'w') as f:
-            f.write('path, label, pred, node id, depth, method, area, relevance, fidelity\n')
+            f.write('path,label,pred,node id,depth,method,area,relevance,fidelity\n')
 
     wait = args.restart_from is not None
+    target_areas = np.arange(args.target_areas[0], args.target_areas[1] + args.target_areas[2], args.target_areas[2])
 
     stats_iter = tqdm(
         enumerate(img_set),
@@ -267,7 +268,7 @@ if __name__ == '__main__':
             methods=args.methods,
             mode=args.mode,
             img_name=img_name,
-            target_areas=args.target_areas,
+            target_areas=target_areas,
             output=args.output,
             device=args.device,
         )

@@ -1,5 +1,4 @@
 import copy
-import numpy as np
 from tqdm import tqdm
 from util.args import *
 from typing import List, Callable
@@ -71,15 +70,15 @@ def create_parser() -> argparse.ArgumentParser:
                         metavar='<path>',
                         required=True,
                         help='Directory for saving the prototypes visualizations')
-    parser.add_argument('--stats_file',
+    parser.add_argument('--output',
                         type=str,
                         metavar='<name>',
                         required=True,
                         help='Stats file name inside projection directory.')
     parser.add_argument('--target_areas',
                         type=float,
-                        nargs='+',
-                        metavar='<value>',
+                        nargs=3,
+                        metavar=('<min>', '<max>', '<increment>'),
                         help='Target bounding box areas')
     parser.add_argument('--random_seed',
                         type=int,
@@ -152,12 +151,10 @@ def compute_prototype_stats(
             grads_sorted = np.sort(np.reshape(grads, (-1)))
 
         img_tensors = [img_tensor.clone().detach()]
-        areas = []
         relevances = []
         for target_area in target_areas:
             if mode == 'bbox':
-                xmin, xmax, ymin, ymax, effective_area = find_threshold_to_area(grads, target_area)
-                areas.append(effective_area)
+                xmin, xmax, ymin, ymax, _ = find_threshold_to_area(grads, target_area)
 
                 # Measure intersection with segmentation (if provided)
                 relevance = np.sum(np.sum(segm[ymin:ymax, xmin:xmax], axis=2) > 0) if segm is not None else 0
@@ -176,8 +173,7 @@ def compute_prototype_stats(
                 img_tensors.append(deleted_img)
             else:
                 # Get binary mask of most salient pixels
-                mask, effective_area = find_mask_to_area(grads, grads_sorted, target_area)
-                areas.append(effective_area)
+                mask, _ = find_mask_to_area(grads, grads_sorted, target_area)
 
                 # Measure intersection with segmentation (if provided)
                 relevance = np.sum((segm[:, :, 0] > 0) * mask) * 1.0 if segm is not None else 0.0
@@ -205,7 +201,7 @@ def compute_prototype_stats(
         relevance_95pc = np.sum((segm[:, :, 0] > 0) * mask) * 1.0 / (np.sum(mask) + 1e-14) if segm is not None else 0.0
 
         with open(os.path.join(output_dir, output_filename), 'a') as fout:
-            for area, relevance, fidelity in zip(areas, relevances, fidelities):
+            for area, relevance, fidelity in zip(target_areas, relevances, fidelities):
                 fout.write(f'{img_name},{node_id},{depth},'
                            f'{method},{area},{relevance},{fidelity}, {relevance_95pc}\n')
 
@@ -227,11 +223,11 @@ def finalize_tree(args: argparse.Namespace = None):
     )
     # Recover preprocessing function
     transform = projectloader.dataset.transform
-
+    target_areas = np.arange(args.target_areas[0], args.target_areas[1] + args.target_areas[2], args.target_areas[2])
     os.makedirs(args.proj_dir, exist_ok=True)
 
     # Reset stat file
-    with open(os.path.join(args.proj_dir, args.stats_file), 'w') as fout:
+    with open(os.path.join(args.proj_dir, args.output), 'w') as fout:
         fout.write('image name,node id,depth,method,area,relevance,fidelity,non biased\n')
 
     # Load tree
@@ -272,8 +268,8 @@ def finalize_tree(args: argparse.Namespace = None):
                 transform=transform,
                 img_name=f'proto_{node_name}',
                 output_dir=args.proj_dir,
-                output_filename=args.stats_file,
-                target_areas=args.target_areas,
+                output_filename=args.output,
+                target_areas=target_areas,
                 mode=args.mode,
                 location=(prototype_location // H, prototype_location % H),
                 device=args.device,
