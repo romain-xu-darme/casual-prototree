@@ -151,6 +151,42 @@ def smoothgrads(
         grads = normalize_min_max(grads)
     return grads
 
+def randgrads(
+        tree: ProtoTree,
+        img_tensor: torch.Tensor,
+        node_id: int,
+        location: Tuple[int, int] = None,
+        device: Optional[str] = 'cuda:0',
+        polarity: Optional[str] = 'absolute',
+        gaussian_ksize: Optional[int] = 5,
+        normalize: Optional[bool] = False,
+        grads_x_input: Optional[bool] = True,
+) -> np.array:
+    """ Perform patch visualization using random gradients
+
+    :param tree: Prototree
+    :param img_tensor: Input image tensor
+    :param node_id: Node index
+    :param location: Coordinates of feature vector
+    :param device: Target device
+    :param polarity: Polarity filter applied on gradients
+    :param gaussian_ksize: Size of Gaussian filter kernel
+    :param normalize: Perform min-max normalization on gradients
+    :param grads_x_input: Use gradient times input mode
+    :return: gradient map
+    """
+    grads = np.random.random(img_tensor.shape[1:])
+    if grads_x_input:
+        grads *= img_tensor[0].detach().cpu().numpy()
+
+    # Post-processing
+    grads = polarity_and_collapse(grads, polarity=polarity, avg_chan=0)
+    if gaussian_ksize:
+        grads = gaussian_filter(grads, sigma=gaussian_ksize)
+    if normalize:
+        grads = normalize_min_max(grads)
+    return grads
+
 
 def prp(
         tree: ProtoTree,
