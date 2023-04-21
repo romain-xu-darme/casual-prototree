@@ -160,7 +160,7 @@ def randgrads(
         polarity: Optional[str] = 'absolute',
         gaussian_ksize: Optional[int] = 5,
         normalize: Optional[bool] = False,
-        grads_x_input: Optional[bool] = True,
+        grads_x_input: Optional[bool] = False,
 ) -> np.array:
     """ Perform patch visualization using random gradients
 

@@ -118,11 +118,9 @@ def finalize_tree(args: argparse.Namespace = None):
         batch_size=args.batch_size,
         device=args.device,
     )
-    # Recover preprocessing function
-    transform = projectloader.dataset.transform
-    os.makedirs(os.path.join(args.proj_dir,'db'), exist_ok=True)
 
     # Reset database file
+    os.makedirs(os.path.join(args.proj_dir, 'db'), exist_ok=True)
     with open(os.path.join(args.proj_dir, "database.csv"), 'w') as fout:
         fout.write('node_id,depth,img_path,method,grad_path,h,w\n')
 

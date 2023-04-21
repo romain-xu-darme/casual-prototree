@@ -196,14 +196,14 @@ def compute_prototype_stats(
         ref_similarity = sim_map[0, h, w]
         fidelities = sim_map[1:, h, w] / ref_similarity
 
-        # Compute intersection betwen 95 percentile mask and segmentation (default in ProtoPNet)
-        mask = grads > np.percentile(grads, 95)
-        relevance_95pc = np.sum((segm[:, :, 0] > 0) * mask) * 1.0 / (np.sum(mask) + 1e-14) if segm is not None else 0.0
+        # Compute intersection betwen 98 percentile mask and segmentation
+        mask = grads > np.percentile(grads, 98)
+        relevance_98pc = np.sum((segm[:, :, 0] > 0) * mask) * 1.0 / (np.sum(mask) + 1e-14) if segm is not None else 0.0
 
         with open(os.path.join(output_dir, output_filename), 'a') as fout:
             for area, relevance, fidelity in zip(target_areas, relevances, fidelities):
                 fout.write(f'{img_name},{node_id},{depth},'
-                           f'{method},{area},{relevance},{fidelity}, {relevance_95pc}\n')
+                           f'{method},{area},{relevance},{fidelity},{relevance_98pc}\n')
 
         if not quiet:
             mask = np.expand_dims(mask, 2)
