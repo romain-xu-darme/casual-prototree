@@ -75,6 +75,8 @@ def get_network(net: str, init_mode: str, num_features: int) -> Tuple[nn.Module,
     elif features_name.startswith('DENSE'):
         first_add_on_layer_in_channels = \
             [i for i in features.modules() if isinstance(i, nn.BatchNorm2d)][-1].num_features
+    elif features_name.startswith('PARTICUL'):
+        first_add_on_layer_in_channels = features.extractor.nfchans
     else:
         raise Exception('other base base_architecture NOT implemented')
 

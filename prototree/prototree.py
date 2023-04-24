@@ -4,6 +4,7 @@ import numpy as np
 
 import torch
 import torch.nn as nn
+from particul.feature_enhancer.model import ParticulFeatureEnhancer
 
 from prototree.branch import Branch
 from prototree.leaf import Leaf
@@ -78,6 +79,11 @@ class ProtoTree(nn.Module):
         self._net = features_net
         self._add_on = add_on_layers
 
+        self._use_particul = False
+        if isinstance(self._net, ParticulFeatureEnhancer):
+            print("INFO: Using Particul feature enhancement")
+            self._use_particul = True
+
         # Flag that indicates whether probabilities or log probabilities are computed
         self._log_probabilities = log_probabilities
 
@@ -123,6 +129,10 @@ class ProtoTree(nn.Module):
             param.requires_grad = val
 
     @property
+    def use_particul(self) -> bool:
+        return self._use_particul
+
+    @property
     def add_on_layers_require_grad(self) -> bool:
         return any([param.requires_grad for param in self._add_on.parameters()])
 
@@ -141,10 +151,15 @@ class ProtoTree(nn.Module):
         '''
             PERFORM A FORWARD PASS THROUGH THE FEATURE NET
         '''
+        if not hasattr(self, '_use_particul'):
+            self._use_particul = False
         if not hasattr(self, '_focal_distance'):
             self._focal_distance = False
         # Perform a forward pass with the conv net
-        features = self._net(xs)
+        if self._use_particul:
+            features, _, amaps = self._net(xs)
+        else:
+            features = self._net(xs)
         features = self._add_on(features)
         bs, D, W, H = features.shape
 
@@ -249,6 +264,9 @@ class ProtoTree(nn.Module):
         else:
             raise Exception('Sampling strategy not recognized!')
 
+        if self._use_particul and self.training:
+            # Also return Particul activation maps during training
+            return dists, info, amaps
         return dists, info
 
     def forward_partial(self, xs: torch.Tensor) -> tuple:
@@ -256,7 +274,7 @@ class ProtoTree(nn.Module):
             self._focal_distance = False
 
         # Perform a forward pass with the conv net
-        features = self._net(xs)
+        features = self._net(xs)[0] if self._use_particul else self._net(xs)
         features = self._add_on(features)
 
         # Use the features to compute the distances from the prototypes

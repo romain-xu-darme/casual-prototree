@@ -224,6 +224,24 @@ def add_training_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParse
                         default=2,
                         help='Number of epochs where pretrained features_net will be frozen'
                         )
+    parser.add_argument('--particul_ratio',
+                        type=float,
+                        metavar='<percentage>',
+                        default=0.1,
+                        help='Percentage of particulment constraint in the loss function (default: 0.1)'
+                        )
+    parser.add_argument('--particul_unq_ratio',
+                        type=float,
+                        metavar='<percentage>',
+                        default=0.2,
+                        help='Percentage of unicity constraint in the particul loss function (default: 0.2)'
+                        )
+    parser.add_argument('--particul_cls_ratio',
+                        type=float,
+                        metavar='<percentage>',
+                        default=0.1,
+                        help='Percentage of clustering constraint in the particul loss function (default: 0.1)'
+                        )
     parser.add_argument('--skip_eval_after_training',
                         action='store_true',
                         help='Skip network evaluation after pruning and projection.'

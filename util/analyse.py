@@ -76,7 +76,7 @@ def analyse_output_shape(tree: ProtoTree, trainloader: DataLoader, log: Log, dev
         xs, ys = next(iter(trainloader))
         xs, ys = xs.to(device), ys.to(device)
         log.log_message("Image input shape: "+str(xs[0, :, :, :].shape))
-        net_out = tree._net(xs)
+        net_out = tree._net(xs) if not tree.use_particul else tree._net(xs)[0]
         log.log_message("Features output shape (without 1x1 conv layer): "+str(net_out.shape))
         log.log_message("Convolutional output shape (with 1x1 conv layer): "+str(tree._add_on(net_out).shape))
         log.log_message("Prototypes shape: "+str(tree.prototype_layer.prototype_vectors.shape))

@@ -9,6 +9,7 @@ from prototree.test import eval_accuracy, eval_fidelity
 from prototree.prune import prune
 from prototree.project import project_with_class_constraints
 from prototree.upsample import upsample_prototypes
+from particul.detector.loss import ParticulLoss
 
 import torch
 from copy import deepcopy
@@ -109,8 +110,20 @@ def run_tree(args: argparse.Namespace = None):
         epoch += 1
 
     # Create a csv log for storing the test accuracy, mean train accuracy and mean loss for each epoch
-    logged_values = ('test_acc', 'mean_total_loss', 'mean_train_acc')
+    logged_values = ('test_acc', 'mean_total_loss', 'mean_train_acc', 'mean_cce_loss')
+    if tree.use_particul:
+        logged_values += ('particul_loss', 'loc_loss', 'unq_loss', 'cls_loss')
     log.create_log('log_epoch_overview', 'epoch', *logged_values)
+
+    # Init Particul loss if necessary
+    particul_loss = ParticulLoss(
+        npatterns=tree._net.npatterns,
+        loc_ksize=3,
+        unq_ratio=args.particul_unq_ratio,
+        unq_thres=1.0,
+        cls_ratio=args.particul_cls_ratio,
+        cls_thres=0.0,
+    ).to(device) if tree.use_particul else None
 
     if epoch < args.epochs+1:
         '''
@@ -120,17 +133,21 @@ def run_tree(args: argparse.Namespace = None):
             log.log_message("\nEpoch %s" % str(epoch))
             # Freeze (part of) network for some epochs if indicated in args
             freeze(epoch, params_to_freeze, params_to_train, args.freeze_epochs, log)
+            if tree.use_particul:
+                # WARNING: In Particul mode, last layer of the convnet is also frozen
+                tree._net.set_trainable('detectors', True)
+                tree._net.set_trainable('backbone', epoch > args.freeze_epochs)
             log_learning_rates(optimizer, args, log)
 
             # Train tree
             if tree._kontschieder_train:
                 train_info = train_epoch_kontschieder(
                     tree, trainloader, optimizer, epoch,
-                    args.disable_derivative_free_leaf_optim, device)
+                    args.disable_derivative_free_leaf_optim, device, args.particul_ratio, particul_loss)
             else:
                 train_info = train_epoch(
                     tree, trainloader, optimizer, epoch,
-                    args.disable_derivative_free_leaf_optim, device)
+                    args.disable_derivative_free_leaf_optim, device, args.particul_ratio, particul_loss)
             # Update scheduler and leaf labels before saving checkpoints
             scheduler.step()
             leaf_labels = analyse_leafs(tree, epoch, len(classes), leaf_labels, args.pruning_threshold_leaves, log)
@@ -150,10 +167,16 @@ def run_tree(args: argparse.Namespace = None):
                 best_test_acc = save_best_test_tree(
                     tree, optimizer, scheduler, epoch,
                     best_train_acc, original_test_acc, best_test_acc, leaf_labels, args, log)
-                stats = (original_test_acc, train_info['loss'], train_info['train_accuracy'])
+                stats = (original_test_acc, train_info['loss'], train_info['train_accuracy'], train_info['cce_loss'])
+                if tree.use_particul:
+                    stats += (train_info['particul_loss'],
+                              train_info['loc_loss'], train_info['unq_loss'], train_info['cls_loss'])
                 log.log_values('log_epoch_overview', epoch, *stats)
             else:
-                stats = ("n.a.", train_info['loss'], train_info['train_accuracy'])
+                stats = ("n.a.", train_info['loss'], train_info['train_accuracy'], train_info['cce_loss'])
+                if tree.use_particul:
+                    stats += (train_info['particul_loss'],
+                              train_info['loc_loss'], train_info['unq_loss'], train_info['cls_loss'])
                 log.log_values('log_epoch_overview', epoch, *stats)
 
     else:  # tree was loaded and not trained, so evaluate only
@@ -169,7 +192,9 @@ def run_tree(args: argparse.Namespace = None):
             best_test_acc = save_best_test_tree(
                 tree, optimizer, scheduler, epoch,
                 best_train_acc, original_test_acc, best_test_acc, leaf_labels, args, log)
-            stats = (original_test_acc, "n.a.", "n.a.")
+            stats = (original_test_acc, "n.a.", "n.a.", "n.a.")
+            if tree.use_particul:
+                stats += ('n.a.', 'n.a.', 'n.a.')
             log.log_values('log_epoch_overview', epoch, *stats)
 
     '''
