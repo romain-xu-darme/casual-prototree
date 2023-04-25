@@ -224,6 +224,12 @@ def add_training_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParse
                         default=2,
                         help='Number of epochs where pretrained features_net will be frozen'
                         )
+    parser.add_argument('--particul_freeze',
+                        type=int,
+                        metavar='<epochs>',
+                        default=0,
+                        help='Number of epochs where particul detectors will be frozen'
+                        )
     parser.add_argument('--particul_ratio',
                         type=float,
                         metavar='<percentage>',

@@ -135,7 +135,7 @@ def run_tree(args: argparse.Namespace = None):
             freeze(epoch, params_to_freeze, params_to_train, args.freeze_epochs, log)
             if tree.use_particul:
                 # WARNING: In Particul mode, last layer of the convnet is also frozen
-                tree._net.set_trainable('detectors', True)
+                tree._net.set_trainable('detectors', epoch > args.particul_freeze)
                 tree._net.set_trainable('backbone', epoch > args.freeze_epochs)
             log_learning_rates(optimizer, args, log)
 
